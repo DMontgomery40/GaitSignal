@@ -1,0 +1,94 @@
+// MediaPipe Pose landmark indices
+export const LANDMARK = {
+  LEFT_SHOULDER: 11,
+  RIGHT_SHOULDER: 12,
+  LEFT_HIP: 23,
+  RIGHT_HIP: 24,
+  LEFT_KNEE: 25,
+  RIGHT_KNEE: 26,
+  LEFT_ANKLE: 27,
+  RIGHT_ANKLE: 28,
+  LEFT_HEEL: 29,
+  RIGHT_HEEL: 30,
+  LEFT_FOOT_INDEX: 31,
+  RIGHT_FOOT_INDEX: 32,
+} as const;
+
+// All lower-body + torso landmark indices used by the filter
+export const LOWER_BODY_INDICES = [
+  LANDMARK.LEFT_SHOULDER,
+  LANDMARK.RIGHT_SHOULDER,
+  LANDMARK.LEFT_HIP,
+  LANDMARK.RIGHT_HIP,
+  LANDMARK.LEFT_KNEE,
+  LANDMARK.RIGHT_KNEE,
+  LANDMARK.LEFT_ANKLE,
+  LANDMARK.RIGHT_ANKLE,
+  LANDMARK.LEFT_HEEL,
+  LANDMARK.RIGHT_HEEL,
+  LANDMARK.LEFT_FOOT_INDEX,
+  LANDMARK.RIGHT_FOOT_INDEX,
+] as const;
+
+// Default configuration
+export const DEFAULT_FPS = 30;
+export const SMOOTHING_ALPHA = 0.3;
+export const CONFIDENCE_THRESHOLD = 0.5;
+export const MAX_INTERPOLATION_GAP = 3;
+
+// Skeleton overlay colors
+export const SKELETON_COLORS = {
+  NORMAL: '#00f0ff',
+  ELEVATED: '#ffb800',
+  CRITICAL: '#ff3344',
+  JOINT_FILL: '#0a0a0f',
+} as const;
+
+// Design system colors
+export const COLORS = {
+  BG: '#0a0a0f',
+  SURFACE: '#12121a',
+  BORDER: '#1e1e2e',
+  TEXT_PRIMARY: '#e0e0e8',
+  TEXT_SECONDARY: '#6b6b80',
+  NORMAL: '#00f0ff',
+  ELEVATED: '#ffb800',
+  CRITICAL: '#ff3344',
+} as const;
+
+// Keypoint connection pairs for skeleton drawing [from, to]
+export const SKELETON_CONNECTIONS: readonly [number, number][] = [
+  // Torso
+  [LANDMARK.LEFT_SHOULDER, LANDMARK.RIGHT_SHOULDER],
+  [LANDMARK.LEFT_SHOULDER, LANDMARK.LEFT_HIP],
+  [LANDMARK.RIGHT_SHOULDER, LANDMARK.RIGHT_HIP],
+  [LANDMARK.LEFT_HIP, LANDMARK.RIGHT_HIP],
+  // Left leg
+  [LANDMARK.LEFT_HIP, LANDMARK.LEFT_KNEE],
+  [LANDMARK.LEFT_KNEE, LANDMARK.LEFT_ANKLE],
+  [LANDMARK.LEFT_ANKLE, LANDMARK.LEFT_HEEL],
+  [LANDMARK.LEFT_ANKLE, LANDMARK.LEFT_FOOT_INDEX],
+  [LANDMARK.LEFT_HEEL, LANDMARK.LEFT_FOOT_INDEX],
+  // Right leg
+  [LANDMARK.RIGHT_HIP, LANDMARK.RIGHT_KNEE],
+  [LANDMARK.RIGHT_KNEE, LANDMARK.RIGHT_ANKLE],
+  [LANDMARK.RIGHT_ANKLE, LANDMARK.RIGHT_HEEL],
+  [LANDMARK.RIGHT_ANKLE, LANDMARK.RIGHT_FOOT_INDEX],
+  [LANDMARK.RIGHT_HEEL, LANDMARK.RIGHT_FOOT_INDEX],
+] as const;
+
+// Landmark name mapping for display
+export const LANDMARK_NAMES: Record<number, string> = {
+  [LANDMARK.LEFT_SHOULDER]: 'L Shoulder',
+  [LANDMARK.RIGHT_SHOULDER]: 'R Shoulder',
+  [LANDMARK.LEFT_HIP]: 'L Hip',
+  [LANDMARK.RIGHT_HIP]: 'R Hip',
+  [LANDMARK.LEFT_KNEE]: 'L Knee',
+  [LANDMARK.RIGHT_KNEE]: 'R Knee',
+  [LANDMARK.LEFT_ANKLE]: 'L Ankle',
+  [LANDMARK.RIGHT_ANKLE]: 'R Ankle',
+  [LANDMARK.LEFT_HEEL]: 'L Heel',
+  [LANDMARK.RIGHT_HEEL]: 'R Heel',
+  [LANDMARK.LEFT_FOOT_INDEX]: 'L Foot',
+  [LANDMARK.RIGHT_FOOT_INDEX]: 'R Foot',
+};
