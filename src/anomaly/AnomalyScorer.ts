@@ -83,6 +83,7 @@ export class AnomalyScorer {
 
     let baselineScoreSum = 0;
     let shortTermScoreSum = 0;
+    let mediumTermScoreSum = 0;
     let rocScoreSum = 0;
     let correlatedCount = 0;
 
@@ -90,23 +91,31 @@ export class AnomalyScorer {
       const w = FEATURE_WEIGHTS[i];
       const bz = Math.abs(baselineDeviation.zScores[i]);
       const sz = Math.abs(shortTermZ[i]);
+      const mz = Math.abs(mediumTermZ[i]);
       const roc = Math.abs(rateOfChange[i]);
 
       // Weighted contribution from each scoring dimension
       const baselineContrib = Math.min(bz / 3.0, 1.0) * w;
       const shortTermContrib = Math.min(sz / 3.0, 1.0) * w;
+      const mediumTermContrib = Math.min(mz / 3.0, 1.0) * w;
       const rocContrib = Math.min(roc / 2.0, 1.0) * w;
 
       baselineScoreSum += baselineContrib;
       shortTermScoreSum += shortTermContrib;
+      mediumTermScoreSum += mediumTermContrib;
       rocScoreSum += rocContrib;
 
       // Count correlated deviations (features where multiple signals agree)
-      if (bz > 1.5 && (sz > 1.5 || roc > 1.0)) {
+      if (bz > 1.5 && (sz > 1.5 || mz > 1.5 || roc > 1.0)) {
         correlatedCount++;
       }
 
-      const totalContrib = (baselineContrib * 0.3 + shortTermContrib * 0.3 + rocContrib * 0.4);
+      const totalContrib = (
+        baselineContrib * 0.25 +
+        shortTermContrib * 0.25 +
+        mediumTermContrib * 0.15 +
+        rocContrib * 0.35
+      );
 
       contributions.push({
         featureName: FEATURE_NAMES[i],
@@ -122,13 +131,15 @@ export class AnomalyScorer {
     // Normalize dimension scores to [0, 1]
     const baselineDeviationScore = Math.min(baselineScoreSum / WEIGHT_SUM, 1.0);
     const shortTermDeviationScore = Math.min(shortTermScoreSum / WEIGHT_SUM, 1.0);
+    const mediumTermDeviationScore = Math.min(mediumTermScoreSum / WEIGHT_SUM, 1.0);
     const rateOfChangeScore = Math.min(rocScoreSum / WEIGHT_SUM, 1.0);
 
     // Composite: rate of change is weighted most heavily (the key insight)
     const rawComposite =
-      rateOfChangeScore * 0.4 +
-      baselineDeviationScore * 0.3 +
-      shortTermDeviationScore * 0.3;
+      rateOfChangeScore * 0.35 +
+      baselineDeviationScore * 0.25 +
+      shortTermDeviationScore * 0.25 +
+      mediumTermDeviationScore * 0.15;
 
     // Apply correlation bonus: multiple features deviating together increases score
     const correlationMultiplier = 1.0 + Math.min(correlatedCount, 6) * 0.05;

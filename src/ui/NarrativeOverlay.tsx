@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import type { NarrativeOverlay as NarrativeOverlayType } from '../types/index.ts';
 
 interface NarrativeOverlayProps {
@@ -6,19 +5,9 @@ interface NarrativeOverlayProps {
 }
 
 export default function NarrativeOverlay({ overlay }: NarrativeOverlayProps) {
-  const [visible, setVisible] = useState(false);
-  const [currentText, setCurrentText] = useState('');
-  const [currentType, setCurrentType] = useState<NarrativeOverlayType['type']>('context');
-
-  useEffect(() => {
-    if (overlay) {
-      setCurrentText(overlay.text);
-      setCurrentType(overlay.type);
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  }, [overlay]);
+  const visible = Boolean(overlay);
+  const currentText = overlay?.text ?? '';
+  const currentType = overlay?.type ?? 'context';
 
   const typeStyles: Record<NarrativeOverlayType['type'], string> = {
     context: 'border-l-cyan',

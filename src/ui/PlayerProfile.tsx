@@ -104,8 +104,7 @@ function RadarChart({
 
       g.append('polygon')
         .attr('points', currentPoints.map((p) => p.join(',')).join(' '))
-        .attr('fill', '#ffb800')
-        .attr('fill-opacity', 0.06)
+        .attr('fill', 'none')
         .attr('stroke', '#ffb800')
         .attr('stroke-width', 1.5)
         .attr('stroke-opacity', 0.8);

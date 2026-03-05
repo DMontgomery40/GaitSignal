@@ -241,6 +241,11 @@ export interface NarrativeOverlay {
   type: 'context' | 'detection' | 'result';
 }
 
+export interface SignalTimelineEntry {
+  state: SignalStateType;
+  startTimestampMs: number;
+}
+
 export interface ScenarioInfo {
   id: string;
   name: string;
@@ -249,6 +254,7 @@ export interface ScenarioInfo {
   durationMs: number;
   anomalyConfig: AnomalyConfig | null;
   narrativeOverlays: NarrativeOverlay[];
+  signalTimeline?: SignalTimelineEntry[];
 }
 
 export interface DemoFrame {

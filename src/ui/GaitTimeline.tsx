@@ -1,11 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   ReferenceLine,
-  ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
 import type { GaitMetricsSnapshot, AnomalyResult, SignalEvent } from '../types/index.ts';
@@ -92,6 +91,23 @@ function Sparkline({
   currentTime: number;
   signalEvents: SignalEvent[];
 }) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  useEffect(() => {
+    const el = chartContainerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setChartWidth(Math.max(0, Math.floor(entry.contentRect.width)));
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const latestValue = data.length > 0 ? data[data.length - 1][config.dataKey] : 0;
   const numValue = typeof latestValue === 'number' ? latestValue : 0;
 
@@ -110,9 +126,9 @@ function Sparkline({
           {numValue.toFixed(config.dataKey === 'anomalyScore' ? 2 : 1)}{config.unit}
         </span>
       </div>
-      <div className="h-16">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 2, right: 4, bottom: 2, left: 4 }}>
+      <div ref={chartContainerRef} className="h-16 w-full min-w-0">
+        {chartWidth > 0 && (
+          <LineChart width={chartWidth} height={64} data={data} margin={{ top: 2, right: 4, bottom: 2, left: 4 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="#1e1e2e"
@@ -149,7 +165,7 @@ function Sparkline({
               isAnimationActive={false}
             />
           </LineChart>
-        </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

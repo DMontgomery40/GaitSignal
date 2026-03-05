@@ -6,6 +6,7 @@ import type {
   ScenarioInfo,
   AnomalyConfig,
   NarrativeOverlay,
+  SignalTimelineEntry,
   DemoFrame,
 } from '../types/index.ts';
 import { SGA_PROFILE, JOKIC_PROFILE, TATUM_PROFILE } from './PlayerProfiles.ts';
@@ -90,10 +91,17 @@ const sgaAnomalyConfig: AnomalyConfig = {
   type: 'knee_compensation',
   onsetTimestampMs: 40000,
   rampDurationMs: 13000, // ~13 second sigmoid ramp
-  peakSeverity: 0.85,
+  peakSeverity: 1.0,
   affectedSide: 'right',
   affectedFeatures: [1, 2, 10, 11, 13, 14, 16, 17, 18, 19],
 };
+
+const sgaSignalTimeline: SignalTimelineEntry[] = [
+  { state: 'monitoring', startTimestampMs: 0 },
+  { state: 'alert', startTimestampMs: 60000 },
+  { state: 'confirmed', startTimestampMs: 80000 },
+  { state: 'actionable', startTimestampMs: 95000 },
+];
 
 const sgaScenarioInfo: ScenarioInfo = {
   id: 'sga-knee',
@@ -104,6 +112,7 @@ const sgaScenarioInfo: ScenarioInfo = {
   durationMs: 150000, // 2.5 minutes (compressed from 3 min game time to ~90s at 1x speed with 30fps)
   anomalyConfig: sgaAnomalyConfig,
   narrativeOverlays: sgaNarratives,
+  signalTimeline: sgaSignalTimeline,
 };
 
 // --- Scenario 2: "Jokic Fatigue Drift" ---
@@ -157,10 +166,17 @@ const jokicAnomalyConfig: AnomalyConfig = {
   type: 'fatigue_drift',
   onsetTimestampMs: 15000,
   rampDurationMs: 60000, // Very slow ramp — 60 seconds for fatigue
-  peakSeverity: 0.65,
+  peakSeverity: 1.25,
   affectedSide: 'bilateral',
   affectedFeatures: [0, 1, 9, 10, 12, 13, 15, 16, 18],
 };
+
+const jokicSignalTimeline: SignalTimelineEntry[] = [
+  { state: 'monitoring', startTimestampMs: 0 },
+  { state: 'alert', startTimestampMs: 60000 },
+  { state: 'confirmed', startTimestampMs: 80000 },
+  { state: 'actionable', startTimestampMs: 95000 },
+];
 
 const jokicScenarioInfo: ScenarioInfo = {
   id: 'jokic-fatigue',
@@ -171,7 +187,14 @@ const jokicScenarioInfo: ScenarioInfo = {
   durationMs: 120000, // 2 minutes
   anomalyConfig: jokicAnomalyConfig,
   narrativeOverlays: jokicNarratives,
+  signalTimeline: jokicSignalTimeline,
 };
+
+const tatumSignalTimeline: SignalTimelineEntry[] = [
+  { state: 'monitoring', startTimestampMs: 0 },
+  { state: 'alert', startTimestampMs: 30000 },
+  { state: 'monitoring', startTimestampMs: 38000 },
+];
 
 // --- Scenario 3: "Tatum False Negative Avoidance" ---
 
@@ -229,6 +252,7 @@ const tatumScenarioInfo: ScenarioInfo = {
   durationMs: 90000, // 1.5 minutes
   anomalyConfig: null, // Handled by transient spike generator
   narrativeOverlays: tatumNarratives,
+  signalTimeline: tatumSignalTimeline,
 };
 
 // --- Scenario registry ---
@@ -266,6 +290,7 @@ export function generateFramesForScenario(
       28000, // Spike onset at 28s (hard foul)
       4000, // Spike lasts ~4 seconds (3-4 steps at 1.35 Hz)
       scenario.narrativeOverlays,
+      scenario.signalTimeline ?? null,
     );
   } else {
     data = generateScenarioFrames(
@@ -274,6 +299,7 @@ export function generateFramesForScenario(
       fps,
       scenario.anomalyConfig,
       scenario.narrativeOverlays,
+      scenario.signalTimeline ?? null,
     );
   }
 

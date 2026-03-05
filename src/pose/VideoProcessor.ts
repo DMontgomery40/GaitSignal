@@ -1,4 +1,4 @@
-import type { KeypointFrame, ProcessedFrame, FilteredKeypoints } from '../types/index';
+import type { KeypointFrame, ProcessedFrame } from '../types/index';
 import { PoseEngine } from './PoseEngine';
 import { KeypointFilter } from './KeypointFilter';
 import { DEFAULT_FPS } from '../utils/constants';

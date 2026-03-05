@@ -129,8 +129,7 @@ function RadarView({ profile, currentVector }: { profile: PlayerProfileJSON; cur
     }
     g.append('polygon')
       .attr('points', cPts.map((p) => p.join(',')).join(' '))
-      .attr('fill', '#ffb800')
-      .attr('fill-opacity', 0.05)
+      .attr('fill', 'none')
       .attr('stroke', '#ffb800')
       .attr('stroke-width', 1.5)
       .attr('stroke-opacity', 0.7);

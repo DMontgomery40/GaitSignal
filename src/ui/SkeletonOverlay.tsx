@@ -56,6 +56,10 @@ const COLOR_NORMAL = '#00f0ff';
 const COLOR_ELEVATED = '#ffb800';
 const COLOR_CRITICAL = '#ff3344';
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function getJointColor(jointKey: string, contributingFeatures: FeatureContribution[]): string {
   let maxContrib = 0;
   for (const feat of contributingFeatures) {
@@ -102,6 +106,92 @@ export default function SkeletonOverlay({ keypoints, contributingFeatures, width
 
     ctx.clearRect(0, 0, width, height);
 
+    const leftShoulder = getPos('leftShoulder');
+    const rightShoulder = getPos('rightShoulder');
+    const leftHip = getPos('leftHip');
+    const rightHip = getPos('rightHip');
+    const leftAnkle = getPos('leftAnkle');
+    const rightAnkle = getPos('rightAnkle');
+
+    // Draw a lightweight torso + head so the silhouette reads as a person.
+    if (leftShoulder && rightShoulder && leftHip && rightHip) {
+      const shoulderMid = {
+        x: (leftShoulder.x + rightShoulder.x) / 2,
+        y: (leftShoulder.y + rightShoulder.y) / 2,
+      };
+      const hipMid = {
+        x: (leftHip.x + rightHip.x) / 2,
+        y: (leftHip.y + rightHip.y) / 2,
+      };
+
+      ctx.beginPath();
+      ctx.moveTo(leftShoulder.x * width, leftShoulder.y * height);
+      ctx.lineTo(rightShoulder.x * width, rightShoulder.y * height);
+      ctx.lineTo(rightHip.x * width, rightHip.y * height);
+      ctx.lineTo(leftHip.x * width, leftHip.y * height);
+      ctx.closePath();
+      ctx.fillStyle = '#00f0ff';
+      ctx.globalAlpha = 0.08;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(shoulderMid.x * width, shoulderMid.y * height);
+      ctx.lineTo(hipMid.x * width, hipMid.y * height);
+      ctx.strokeStyle = '#7ec7d2';
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.5;
+      ctx.stroke();
+
+      const head = {
+        x: shoulderMid.x + (hipMid.x - shoulderMid.x) * 0.12,
+        y: shoulderMid.y - 0.12,
+      };
+      ctx.beginPath();
+      ctx.arc(head.x * width, head.y * height, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#00f0ff';
+      ctx.globalAlpha = 0.14;
+      ctx.fill();
+      ctx.strokeStyle = '#7ec7d2';
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Approximate arm swing from ankle phase so upper-body motion is interpretable.
+      if (leftAnkle && rightAnkle) {
+        const phaseDelta = clamp((leftAnkle.x - rightAnkle.x) * 2.4, -0.06, 0.06);
+        const leftElbow = {
+          x: leftShoulder.x - 0.028 - phaseDelta,
+          y: leftShoulder.y + 0.11,
+        };
+        const rightElbow = {
+          x: rightShoulder.x + 0.028 + phaseDelta,
+          y: rightShoulder.y + 0.11,
+        };
+        const leftWrist = {
+          x: leftElbow.x - 0.015 - phaseDelta * 0.6,
+          y: leftElbow.y + 0.1,
+        };
+        const rightWrist = {
+          x: rightElbow.x + 0.015 + phaseDelta * 0.6,
+          y: rightElbow.y + 0.1,
+        };
+
+        ctx.strokeStyle = '#7ec7d2';
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(leftShoulder.x * width, leftShoulder.y * height);
+        ctx.lineTo(leftElbow.x * width, leftElbow.y * height);
+        ctx.lineTo(leftWrist.x * width, leftWrist.y * height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(rightShoulder.x * width, rightShoulder.y * height);
+        ctx.lineTo(rightElbow.x * width, rightElbow.y * height);
+        ctx.lineTo(rightWrist.x * width, rightWrist.y * height);
+        ctx.stroke();
+      }
+    }
+
     // Draw connections
     for (const [a, b] of CONNECTIONS) {
       const posA = getPos(a);
@@ -126,8 +216,8 @@ export default function SkeletonOverlay({ keypoints, contributingFeatures, width
         grad.addColorStop(1, colorB);
         ctx.strokeStyle = grad;
       }
-      ctx.lineWidth = 2.5;
-      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 2.0;
+      ctx.globalAlpha = 0.72;
       ctx.stroke();
     }
 
@@ -139,17 +229,17 @@ export default function SkeletonOverlay({ keypoints, contributingFeatures, width
       const isAnomaly = color !== COLOR_NORMAL;
 
       ctx.beginPath();
-      ctx.arc(pos.x * width, pos.y * height, isAnomaly ? 6 : 4, 0, Math.PI * 2);
+      ctx.arc(pos.x * width, pos.y * height, isAnomaly ? 4.8 : 3.2, 0, Math.PI * 2);
       ctx.fillStyle = color;
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.92;
       ctx.fill();
 
       if (isAnomaly) {
         ctx.beginPath();
-        ctx.arc(pos.x * width, pos.y * height, 10, 0, Math.PI * 2);
+        ctx.arc(pos.x * width, pos.y * height, 8.2, 0, Math.PI * 2);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.globalAlpha = 0.4;
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = 0.3;
         ctx.stroke();
       }
     }

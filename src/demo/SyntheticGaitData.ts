@@ -9,6 +9,7 @@ import type {
   GaitMetricsSnapshot,
   AnomalyResult,
   SignalState,
+  SignalTimelineEntry,
   DemoFrame,
   JointAngles,
   StrideUpdate,
@@ -21,10 +22,31 @@ import { FEATURE_NAMES } from '../types/index.ts';
 
 // --- Random helpers ---
 
-function gaussianRandom(mean: number, stdDev: number): number {
+type Rng = () => number;
+
+function hashSeed(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createSeededRng(seed: number): Rng {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6D2B79F5;
+    let x = Math.imul(t ^ (t >>> 15), 1 | t);
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function gaussianRandom(mean: number, stdDev: number, rng: Rng): number {
   // Box-Muller transform
-  const u1 = Math.random();
-  const u2 = Math.random();
+  const u1 = rng();
+  const u2 = rng();
   const z = Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2);
   return mean + z * stdDev;
 }
@@ -49,10 +71,11 @@ function clamp(value: number, min: number, max: number): number {
 function generateBaselineFeatureVector(
   profile: PlayerProfileJSON,
   noiseScale: number = 1.0,
+  rng: Rng,
 ): number[] {
   const { baselineMean, baselineStdDev } = profile;
   return baselineMean.map((mean, i) => {
-    const noise = gaussianRandom(0, baselineStdDev[i] * 0.3 * noiseScale);
+    const noise = gaussianRandom(0, baselineStdDev[i] * 0.18 * noiseScale, rng);
     return mean + noise;
   });
 }
@@ -187,55 +210,81 @@ function featureVectorToKeypoints(
   frameIndex: number,
   timestampMs: number,
   stridePhase: number, // 0..1 within stride cycle
+  rng: Rng,
 ): FilteredKeypoints {
   // Base body proportions (normalized coordinates, 0..1 range)
-  const hipY = 0.5;
-  const shoulderY = 0.28;
-  const kneeY = 0.7;
-  const ankleY = 0.88;
-  const footY = 0.92;
-  const heelY = 0.90;
+  const hipYBase = 0.52;
+  const shoulderYBase = 0.30;
+  const kneeYBase = 0.70;
+  const ankleYBase = 0.88;
+  const footYBase = 0.92;
+  const heelYBase = 0.905;
 
-  // Horizontal center
+  // Body center and widths
   const cx = 0.5;
   const hipWidth = 0.08;
-  const shoulderWidth = 0.12;
+  const shoulderWidth = 0.125;
 
-  // Stride cycle modulation -- sinusoidal movement
+  // Stride cycle modulation
   const phase = stridePhase * Math.PI * 2;
-  const swingAmplitude = 0.04;
+  const swing = Math.sin(phase); // left-forward when positive
+  const swingOpp = -swing;
 
-  // Left leg leads on phase 0..pi, right on pi..2pi
-  const leftSwing = Math.sin(phase) * swingAmplitude;
-  const rightSwing = Math.sin(phase + Math.PI) * swingAmplitude;
+  // Slight up/down COM movement for a running cadence
+  const pelvisBob = Math.abs(Math.sin(phase * 2)) * 0.007;
 
-  // Knee flexion affects Y position (more flexion = higher knee relative to ankle)
+  // Modulate stride amplitude by current stride-length features
+  const strideAmplitude =
+    0.03 + clamp(((features[9] + features[10]) / 2 - 1.15) * 0.05, -0.008, 0.018);
+
+  const leftStepX = swing * strideAmplitude;
+  const rightStepX = swingOpp * strideAmplitude;
+  const leftSwingLift = Math.max(0, swing) * 0.04;
+  const rightSwingLift = Math.max(0, swingOpp) * 0.04;
+
+  // Knee flexion affects knee vertical lift
   const lKneeFlexRad = (features[0] * Math.PI) / 180;
   const rKneeFlexRad = (features[1] * Math.PI) / 180;
-  const lKneeYOffset = Math.sin(lKneeFlexRad) * 0.02 * Math.abs(Math.sin(phase));
-  const rKneeYOffset = Math.sin(rKneeFlexRad) * 0.02 * Math.abs(Math.cos(phase));
+  const lKneeYOffset = Math.sin(lKneeFlexRad) * 0.018 * (0.5 + Math.abs(swing));
+  const rKneeYOffset = Math.sin(rKneeFlexRad) * 0.018 * (0.5 + Math.abs(swingOpp));
 
-  // Trunk lean and tilt
+  // Trunk lean and tilt offsets
   const trunkLeanRad = (features[18] * Math.PI) / 180;
   const trunkTiltRad = (features[19] * Math.PI) / 180;
-  const shoulderXOffset = Math.sin(trunkLeanRad) * 0.02;
-  const shoulderTiltOffset = Math.sin(trunkTiltRad) * 0.015;
+  const shoulderXOffset = Math.sin(trunkLeanRad) * 0.015;
+  const shoulderTiltOffset = Math.sin(trunkTiltRad) * 0.012;
+
+  const leftHipX = cx - hipWidth + swing * 0.004;
+  const rightHipX = cx + hipWidth + swingOpp * 0.004;
+  const hipY = hipYBase + pelvisBob;
+
+  const leftAnkleX = leftHipX + leftStepX * 1.45;
+  const rightAnkleX = rightHipX + rightStepX * 1.45;
+  const leftAnkleY = ankleYBase - leftSwingLift * 0.75;
+  const rightAnkleY = ankleYBase - rightSwingLift * 0.75;
+
+  const leftKneeX = (leftHipX + leftAnkleX) / 2 + leftStepX * 0.22;
+  const rightKneeX = (rightHipX + rightAnkleX) / 2 + rightStepX * 0.22;
+  const leftKneeY = kneeYBase - lKneeYOffset - leftSwingLift * 0.45 + pelvisBob * 0.3;
+  const rightKneeY = kneeYBase - rKneeYOffset - rightSwingLift * 0.45 + pelvisBob * 0.3;
+
+  const shoulderY = shoulderYBase + pelvisBob * 0.35;
 
   const p = (x: number, y: number, z: number = 0): Point3D => ({ x, y, z });
 
   return {
     timestampMs,
     frameIndex,
-    leftHip: p(cx - hipWidth, hipY + leftSwing * 0.3, 0),
-    rightHip: p(cx + hipWidth, hipY + rightSwing * 0.3, 0),
-    leftKnee: p(cx - hipWidth + leftSwing, kneeY - lKneeYOffset, 0),
-    rightKnee: p(cx + hipWidth + rightSwing, kneeY - rKneeYOffset, 0),
-    leftAnkle: p(cx - hipWidth + leftSwing * 1.5, ankleY, 0),
-    rightAnkle: p(cx + hipWidth + rightSwing * 1.5, ankleY, 0),
-    leftHeel: p(cx - hipWidth + leftSwing * 1.6, heelY, 0),
-    rightHeel: p(cx + hipWidth + rightSwing * 1.6, heelY, 0),
-    leftFootIndex: p(cx - hipWidth + leftSwing * 1.8, footY, 0),
-    rightFootIndex: p(cx + hipWidth + rightSwing * 1.8, footY, 0),
+    leftHip: p(leftHipX, hipY, 0),
+    rightHip: p(rightHipX, hipY, 0),
+    leftKnee: p(leftKneeX, leftKneeY, 0),
+    rightKnee: p(rightKneeX, rightKneeY, 0),
+    leftAnkle: p(leftAnkleX, leftAnkleY, 0),
+    rightAnkle: p(rightAnkleX, rightAnkleY, 0),
+    leftHeel: p(leftAnkleX - 0.015, heelYBase - leftSwingLift * 0.8, 0),
+    rightHeel: p(rightAnkleX - 0.015, heelYBase - rightSwingLift * 0.8, 0),
+    leftFootIndex: p(leftAnkleX + 0.018 + leftStepX * 0.18, footYBase - leftSwingLift, 0),
+    rightFootIndex: p(rightAnkleX + 0.018 + rightStepX * 0.18, footYBase - rightSwingLift, 0),
     leftShoulder: p(
       cx - shoulderWidth + shoulderXOffset - shoulderTiltOffset,
       shoulderY,
@@ -246,7 +295,7 @@ function featureVectorToKeypoints(
       shoulderY,
       0,
     ),
-    confidence: 0.92 + Math.random() * 0.06,
+    confidence: 0.92 + rng() * 0.06,
   };
 }
 
@@ -389,15 +438,17 @@ function computeAnomalyResult(
   }
 
   // Composite: weighted combination
-  const compositeScore = clamp(
-    baselineDeviationScore * 0.4 + rateOfChangeScore * 0.35 + shortTermDeviationScore * 0.25,
-    0,
-    1,
-  );
+  const rawComposite =
+    baselineDeviationScore * 0.4 + rateOfChangeScore * 0.35 + shortTermDeviationScore * 0.25;
+  const compositeScore = clamp(rawComposite * 1.35, 0, 1);
 
   // Confidence: increases with number of correlated features above threshold
   const featuresAboveThreshold = contributions.filter((c) => Math.abs(c.zScore) > 1.5).length;
-  const confidence = clamp(0.3 + featuresAboveThreshold * 0.08, 0, 1);
+  const confidence = clamp(
+    0.22 + compositeScore * 0.88 + Math.min(featuresAboveThreshold, 4) * 0.015,
+    0,
+    1,
+  );
 
   const severity =
     compositeScore >= 0.7
@@ -425,47 +476,56 @@ function computeAnomalyResult(
 function updateSignalState(
   prev: SignalState,
   anomaly: AnomalyResult,
+  isNewStride: boolean,
 ): SignalState {
   const state = { ...prev };
-
-  if (anomaly.compositeScore >= 0.3) {
-    state.consecutiveStridesAboveThreshold++;
-  } else {
-    state.consecutiveStridesAboveThreshold = Math.max(
-      0,
-      state.consecutiveStridesAboveThreshold - 2,
-    );
-  }
-
   state.lastAnomalyResult = anomaly;
 
+  if (!isNewStride) {
+    return state;
+  }
+
+  if (anomaly.compositeScore >= 0.32) {
+    state.consecutiveStridesAboveThreshold += 1;
+  } else {
+    state.consecutiveStridesAboveThreshold = Math.max(0, state.consecutiveStridesAboveThreshold - 1);
+  }
+
   // State transitions
-  if (anomaly.compositeScore < 0.2 && state.consecutiveStridesAboveThreshold <= 0) {
+  if (anomaly.compositeScore < 0.18 && state.consecutiveStridesAboveThreshold <= 0) {
     state.current = 'monitoring';
     state.enteredAt = anomaly.timestampMs;
   } else if (
     state.current === 'monitoring' &&
-    anomaly.compositeScore >= 0.3
+    anomaly.compositeScore >= 0.32 &&
+    state.consecutiveStridesAboveThreshold >= 2
   ) {
     state.current = 'alert';
     state.enteredAt = anomaly.timestampMs;
   } else if (
     state.current === 'alert' &&
     state.consecutiveStridesAboveThreshold >= 5 &&
+    anomaly.compositeScore >= 0.34 &&
     anomaly.confidence >= 0.5
   ) {
     state.current = 'confirmed';
     state.enteredAt = anomaly.timestampMs;
   } else if (
     state.current === 'confirmed' &&
-    ((anomaly.compositeScore >= 0.5 && anomaly.confidence >= 0.7) ||
-      anomaly.compositeScore >= 0.7)
+    (
+      (anomaly.compositeScore >= 0.5 && anomaly.confidence >= 0.7) ||
+      anomaly.compositeScore >= 0.65 ||
+      (state.consecutiveStridesAboveThreshold >= 12 &&
+        anomaly.compositeScore >= 0.35 &&
+        anomaly.confidence >= 0.5)
+    )
   ) {
     state.current = 'actionable';
     state.enteredAt = anomaly.timestampMs;
   } else if (
-    state.current === 'alert' &&
-    anomaly.compositeScore < 0.2
+    (state.current === 'alert' || state.current === 'confirmed' || state.current === 'actionable') &&
+    anomaly.compositeScore < 0.2 &&
+    state.consecutiveStridesAboveThreshold <= 0
   ) {
     state.current = 'monitoring';
     state.enteredAt = anomaly.timestampMs;
@@ -473,6 +533,50 @@ function updateSignalState(
   }
 
   return state;
+}
+
+function applySignalTimeline(
+  prev: SignalState,
+  anomaly: AnomalyResult,
+  timestampMs: number,
+  signalTimeline: SignalTimelineEntry[] | null,
+): SignalState {
+  if (!signalTimeline || signalTimeline.length === 0) {
+    return prev;
+  }
+
+  let active = signalTimeline[0];
+  for (const entry of signalTimeline) {
+    if (timestampMs >= entry.startTimestampMs) {
+      active = entry;
+    } else {
+      break;
+    }
+  }
+
+  const next: SignalState = {
+    ...prev,
+    current: active.state,
+    enteredAt: active.startTimestampMs,
+    lastAnomalyResult: anomaly,
+  };
+
+  const elapsed = Math.max(0, timestampMs - active.startTimestampMs);
+  if (active.state === 'monitoring') {
+    next.consecutiveStridesAboveThreshold = 0;
+  } else if (active.state === 'alert') {
+    next.consecutiveStridesAboveThreshold = Math.min(4, 1 + Math.floor(elapsed / 1200));
+  } else if (active.state === 'confirmed') {
+    next.consecutiveStridesAboveThreshold = Math.min(8, 5 + Math.floor(elapsed / 1500));
+  } else {
+    next.consecutiveStridesAboveThreshold = 8 + Math.floor(elapsed / 1200);
+  }
+
+  return next;
+}
+
+function smoothFeatureVector(next: number[], prev: number[], alpha: number): number[] {
+  return next.map((value, i) => prev[i] + (value - prev[i]) * alpha);
 }
 
 // --- Main generation functions ---
@@ -488,6 +592,7 @@ export function generateScenarioFrames(
   fps: number,
   anomalyConfig: AnomalyConfig | null,
   narrativeOverlays: NarrativeOverlay[],
+  signalTimeline: SignalTimelineEntry[] | null = null,
 ): GeneratedScenarioData {
   const totalFrames = Math.floor((durationMs / 1000) * fps);
   const frameDurationMs = 1000 / fps;
@@ -498,6 +603,8 @@ export function generateScenarioFrames(
 
   const frames: DemoFrame[] = [];
   const recentFeatures: number[][] = [];
+  const rng = createSeededRng(hashSeed(`${profile.player.name}-${durationMs}-${fps}-${anomalyConfig?.type ?? 'none'}`));
+  let prevFeatures = [...profile.baselineMean];
 
   let signalState: SignalState = {
     current: 'monitoring',
@@ -516,7 +623,7 @@ export function generateScenarioFrames(
     if (isNewStride) strideCount++;
 
     // Generate baseline features with natural noise
-    let features = generateBaselineFeatureVector(profile, 1.0);
+    let features = generateBaselineFeatureVector(profile, 1.0, rng);
 
     // Apply anomaly if configured and past onset time
     if (anomalyConfig && timestampMs >= anomalyConfig.onsetTimestampMs) {
@@ -526,12 +633,15 @@ export function generateScenarioFrames(
       features = applyAnomaly(features, anomalyConfig, severity, profile);
     }
 
+    features = smoothFeatureVector(features, prevFeatures, 0.22);
+    prevFeatures = features;
+
     // Store for rate-of-change computation
     recentFeatures.push(features);
     if (recentFeatures.length > 30) recentFeatures.shift();
 
     // Generate derived data
-    const keypoints = featureVectorToKeypoints(features, i, timestampMs, stridePhase);
+    const keypoints = featureVectorToKeypoints(features, i, timestampMs, stridePhase, rng);
     const gaitMetrics = featureVectorToGaitMetrics(
       features,
       i,
@@ -540,7 +650,8 @@ export function generateScenarioFrames(
       isNewStride,
     );
     const anomalyResult = computeAnomalyResult(features, profile, timestampMs, recentFeatures);
-    signalState = updateSignalState(signalState, anomalyResult);
+    signalState = updateSignalState(signalState, anomalyResult, isNewStride);
+    signalState = applySignalTimeline(signalState, anomalyResult, timestampMs, signalTimeline);
 
     // Find active narrative overlay
     const activeOverlay =
@@ -575,6 +686,7 @@ export function generateTransientSpikeFrames(
   spikeOnsetMs: number,
   spikeDurationMs: number,
   narrativeOverlays: NarrativeOverlay[],
+  signalTimeline: SignalTimelineEntry[] | null = null,
 ): GeneratedScenarioData {
   const totalFrames = Math.floor((durationMs / 1000) * fps);
   const frameDurationMs = 1000 / fps;
@@ -583,6 +695,8 @@ export function generateTransientSpikeFrames(
 
   const frames: DemoFrame[] = [];
   const recentFeatures: number[][] = [];
+  const rng = createSeededRng(hashSeed(`${profile.player.name}-${durationMs}-${fps}-transient`));
+  let prevFeatures = [...profile.baselineMean];
 
   let signalState: SignalState = {
     current: 'monitoring',
@@ -599,7 +713,7 @@ export function generateTransientSpikeFrames(
     const isNewStride = i % strideFrames === 0 && i > 0;
     if (isNewStride) strideCount++;
 
-    let features = generateBaselineFeatureVector(profile, 1.0);
+    let features = generateBaselineFeatureVector(profile, 1.0, rng);
 
     // Transient spike: sharp onset, sharp decay
     if (
@@ -629,10 +743,13 @@ export function generateTransientSpikeFrames(
       features[18] += spikeSeverity * 4;
     }
 
+    features = smoothFeatureVector(features, prevFeatures, 0.24);
+    prevFeatures = features;
+
     recentFeatures.push(features);
     if (recentFeatures.length > 30) recentFeatures.shift();
 
-    const keypoints = featureVectorToKeypoints(features, i, timestampMs, stridePhase);
+    const keypoints = featureVectorToKeypoints(features, i, timestampMs, stridePhase, rng);
     const gaitMetrics = featureVectorToGaitMetrics(
       features,
       i,
@@ -641,7 +758,8 @@ export function generateTransientSpikeFrames(
       isNewStride,
     );
     const anomalyResult = computeAnomalyResult(features, profile, timestampMs, recentFeatures);
-    signalState = updateSignalState(signalState, anomalyResult);
+    signalState = updateSignalState(signalState, anomalyResult, isNewStride);
+    signalState = applySignalTimeline(signalState, anomalyResult, timestampMs, signalTimeline);
 
     const activeOverlay =
       narrativeOverlays.find(

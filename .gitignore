@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Research PDFs (too large for repo)
+assets/*.pdf
