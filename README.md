@@ -158,14 +158,6 @@ A per-player SSM is trained autoregressively — given frames 1...t, predict fra
 
 When the player's gait deviates from their learned manifold — a subtle knee compensation, an asymmetry shift, shortened ground contact — the model's predictions diverge from reality. Loss spikes. Gradients spike. The magnitude of that gradient spike, measured as the L2 norm across model parameters, *is* the anomaly score.
 
-This is grounded in recent work:
-
-- **R2-AD2** (Kirchheim et al., ECML-PKDD 2022) demonstrated that models trained on normal data produce categorically different gradient distributions when processing anomalous inputs. A recurrent alarm network over gradient statistics achieves state-of-the-art anomaly detection.
-
-- **GraN** (Ignatiev et al., 2020) showed that the layer-wise gradient norm w.r.t. the loss is a time-efficient, parameter-efficient anomaly signal adaptable to any differentiable model.
-
-- **GradCon** (Kwon et al., ECCV 2020) proved that anomalous inputs require more drastic model updates than normal inputs, and that this asymmetry is captured reliably by backpropagated gradient representations.
-
 The advantage over threshold-based detection: gradient norms capture *multi-dimensional* deviation simultaneously. A player might show 2% more knee asymmetry, 5ms longer ground contact on the left, and 1.5 degrees more trunk lean — each individually sub-threshold, but collectively producing a large gradient norm because the *combination* is unprecedented in the model's training data. The model's embedding space encodes feature correlations that simple per-feature thresholds miss.
 
 ## Engram as a Context Hyperparameter
@@ -240,9 +232,6 @@ Weekly retraining means the model's learned manifold tracks the player's actual 
 | **Engram**: Conditional Memory via Scalable Lookup (Cheng et al., DeepSeek) | arXiv Jan 2026 | O(1) context retrieval with gating. Adapted here for game-context modulation of anomaly thresholds. |
 | **PoseShot**: CNN-BiLSTM-Transformer for Basketball Pose (Scientific Reports) | Sci. Rep. Mar 2026 | Basketball-specific pose analysis. Validates hybrid temporal architectures for sport biomechanics. |
 | **GameSense**: Hierarchical Spatio-Temporal Transformer (Scientific Reports) | Sci. Rep. 2025 | End-to-end basketball tracking + action analysis with hierarchical temporal memory. |
-| **R2-AD2**: Anomaly Detection via Raw Gradient Analysis (Kirchheim et al.) | ECML-PKDD 2022 | Foundational work proving gradient distributions diverge on anomalous inputs. |
-| **GraN**: Gradient-Norm Based Detection (Ignatiev et al.) | arXiv 2020 | Layer-wise gradient norms as efficient anomaly signals. |
-| **Akane**: Perplexity-Guided Time Series Cleaning | SIGMOD 2024 | Perplexity as surprise metric for time series. Directly applicable to gait anomaly scoring. |
 
 ## Demo Scenarios
 
@@ -313,7 +302,7 @@ Together they show:
 
 1. **Novel signal identification** — biomechanical gait deviation as an in-play pricing signal, complementary to tracking data and crowd acoustics
 2. **Per-player personalization at scale** — individual models that capture what's normal for each player, eliminating cross-player false positives
-3. **Gradient-based anomaly scoring** — production-grade approach grounded in recent ML research (R2-AD2, GraN, GradCon), not just statistical thresholds
+3. **Gradient-based anomaly scoring** — gradient-norm surprise as an anomaly signal, not just statistical thresholds
 4. **Multi-modal platform thinking** — GaitSignal + Acoustic Momentum = two orthogonal signal channels, each seeing something the other misses. Crowd noise captures collective human perception. Gait analysis captures individual biomechanical reality. The intersection is where the edge lives.
 5. **Engineering maturity** — the false positive avoidance scenario (Tatum) demonstrates that a good system knows when NOT to fire, which is harder than knowing when to fire
 6. **Current research fluency** — architecture decisions grounded in January–March 2026 publications (SasMamba, Engram, ALoRa-T, MS-SSM), not legacy approaches
