@@ -25,3 +25,10 @@ dist-ssr
 
 # Research PDFs (too large for repo)
 assets/*.pdf
+
+# Project instruction files (not for public repo)
+AGENTS.md
+CLAUDE.md
+DEMO_INDEX.md
+HANDOFF.md
+gaitsignal-agent-prompt.md
