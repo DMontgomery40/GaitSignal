@@ -12,7 +12,7 @@ Arena cameras already see every player on the court. This project turns that foo
 
 ## What It Is (and Isn't)
 
-**What it is:** A concept and interactive demo for a real-time biomechanical deviation detector. The idea: each player gets their own ~70M parameter model that knows nothing except how *that player* moves. When the model is surprised by what it sees — quantified by gradient norm deviation and embedding-space perplexity — that surprise *is* the signal.
+**What it is:** A concept and interactive demo for a real-time biomechanical deviation detector. The idea: each player gets their own ~5M-70M parameter model that knows nothing except how *that player* moves. When the model is surprised by what it sees — quantified by gradient norm deviation and embedding-space perplexity — that surprise *is* the signal.
 
 **What it isn't:** An injury classifier. GaitSignal doesn't diagnose — it detects *change*. A player whose right knee flexion asymmetry jumps from 3% to 7% in thirty seconds produces a strong signal regardless of cause. The downstream interpretation (injury, fatigue, tactical adjustment) is a separate problem.
 
