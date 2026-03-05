@@ -6,6 +6,8 @@
 
 This is the sister project to [Acoustic Momentum](https://github.com/dmontgomery40/acoustic-momentum), which *is* a working model — real audio inference, real crowd noise analysis, real signal generation. GaitSignal takes the opposite approach: start with the idea, the architecture, and the research basis, and build a demo that shows exactly what the production system would do, before writing any of the ML pipeline. The production architecture described below is a detailed proposal grounded in 2026 research, not an implementation.
 
+![GaitSignal — SGA anomaly detected, ACTIONABLE state with betting signals](screenshots/sga-actionable.png)
+
 Arena cameras already see every player on the court. This project turns that footage into a **Gait Anomaly Index** — a continuous [0,1] signal per player that fires when their movement deviates from their own learned baseline, detected via gradient-norm surprise in a player-specific model trained on thousands of games of that player's gait alone.
 
 ## What It Is (and Isn't)
@@ -250,6 +252,10 @@ Three scenarios demonstrate the detection pipeline with pre-computed synthetic d
 
 Shai Gilgeous-Alexander in transition. Subtle right knee compensation after an awkward landing. Model catches the gait shift 47 seconds before the broadcast camera catches SGA grimacing on the bench. Full state machine progression: monitoring → alert → confirmed → actionable. Betting signals fire across player points, team spread, and player rebounds+assists.
 
+| Baseline (monitoring) | Anomaly detected (actionable) |
+|---|---|
+| ![SGA baseline — monitoring state, all metrics normal](screenshots/sga-baseline.png) | ![SGA actionable — knee compensation detected, betting signals firing](screenshots/sga-actionable.png) |
+
 ### 2. "Jokic Fatigue Drift"
 
 Nikola Jokic on a back-to-back. Gradual fatigue-induced gait degradation — stride length shortening, ground contact time increasing over 15 minutes. Lower-confidence signal but still actionable for over/under markets.
@@ -257,6 +263,8 @@ Nikola Jokic on a back-to-back. Gradual fatigue-induced gait degradation — str
 ### 3. "Tatum False Positive Avoidance"
 
 Jayson Tatum takes a hard foul. Three steps of visible limp. Alert triggers immediately — but only three strides above threshold. The model requires five consecutive strides before confirming. Three strides later, he's running normally. Alert dismissed. No false signal reaches the trading desk.
+
+![Tatum — metrics spike after hard foul but system correctly stays in MONITORING](screenshots/tatum-alert.png)
 
 This scenario demonstrates engineering maturity: knowing when *not* to fire is as important as knowing when to fire.
 
