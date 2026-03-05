@@ -108,7 +108,7 @@ function MarketImpactCard({ event, playerName }: { event: SignalEvent; playerNam
         <ConfidenceRing confidence={event.confidence} />
         <div className="flex-1">
           <p className="text-text-primary text-sm font-sans font-semibold leading-tight">
-            Gait anomaly detected {'\u2014'} {playerName} {topFeatureStr.toLowerCase()}
+            Movement anomaly detected {'\u2014'} {playerName} {topFeatureStr.toLowerCase()}
           </p>
           <p className="text-text-secondary text-xs font-mono mt-1">
             Onset: {formatTime(event.timestampMs)}
@@ -128,7 +128,7 @@ function MarketImpactCard({ event, playerName }: { event: SignalEvent; playerNam
       </div>
 
       <p className="font-mono text-xs text-text-secondary">
-        Est. impact: ~{event.marketImpact.estimatedPossessionsToImpact} possessions
+        Est. impact: ~{event.marketImpact.estimatedPhasesToImpact} attacking phases
       </p>
     </div>
   );
@@ -178,7 +178,7 @@ export default function BettingSignalPanel({
     <div className="rounded-lg border border-border bg-surface p-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <span className="text-text-secondary font-mono text-xs tracking-widest uppercase">
-          Betting Signal
+          Trading Signal
         </span>
         <span className="text-text-secondary font-mono text-xs opacity-60">
           DEMO

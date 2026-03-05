@@ -52,16 +52,22 @@ export default function VideoPanel({ keypoints, contributingFeatures, severity, 
           boxShadow: GLOW_COLORS[severity],
         }}
       >
-        {/* Court background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-surface via-bg to-surface" />
+        {/* Pitch background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#081810] via-[#0b2016] to-[#07120d]" />
+        <div className="absolute inset-0 opacity-25 bg-[linear-gradient(180deg,transparent_0%,rgba(255,255,255,0.03)_50%,transparent_100%)]" />
 
-        {/* Court lines */}
+        {/* Pitch lines */}
         <svg className="absolute inset-0 w-full h-full opacity-10" viewBox="0 0 640 360">
-          <rect x="40" y="20" width="560" height="320" fill="none" stroke="#00f0ff" strokeWidth="1" />
-          <line x1="320" y1="20" x2="320" y2="340" stroke="#00f0ff" strokeWidth="0.5" />
-          <circle cx="320" cy="180" r="60" fill="none" stroke="#00f0ff" strokeWidth="0.5" />
-          <rect x="40" y="100" width="140" height="160" fill="none" stroke="#00f0ff" strokeWidth="0.5" />
-          <rect x="460" y="100" width="140" height="160" fill="none" stroke="#00f0ff" strokeWidth="0.5" />
+          <rect x="24" y="20" width="592" height="320" fill="none" stroke="#9ef8ca" strokeWidth="1" />
+          <line x1="320" y1="20" x2="320" y2="340" stroke="#9ef8ca" strokeWidth="0.75" />
+          <circle cx="320" cy="180" r="42" fill="none" stroke="#9ef8ca" strokeWidth="0.75" />
+          <circle cx="320" cy="180" r="2.5" fill="#9ef8ca" />
+          <rect x="24" y="92" width="92" height="176" fill="none" stroke="#9ef8ca" strokeWidth="0.75" />
+          <rect x="24" y="126" width="36" height="108" fill="none" stroke="#9ef8ca" strokeWidth="0.75" />
+          <rect x="524" y="92" width="92" height="176" fill="none" stroke="#9ef8ca" strokeWidth="0.75" />
+          <rect x="580" y="126" width="36" height="108" fill="none" stroke="#9ef8ca" strokeWidth="0.75" />
+          <path d="M116 180a42 42 0 0 0 0-0.1" fill="none" stroke="#9ef8ca" strokeWidth="0.75" />
+          <path d="M524 180a42 42 0 0 1 0-0.1" fill="none" stroke="#9ef8ca" strokeWidth="0.75" />
         </svg>
 
         {/* Skeleton overlay */}
@@ -78,14 +84,14 @@ export default function VideoPanel({ keypoints, contributingFeatures, severity, 
         {/* Live badge */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-bg/80 backdrop-blur-sm rounded px-2 py-1">
           <div className="w-1.5 h-1.5 rounded-full bg-red animate-pulse" />
-          <span className="font-mono text-xs text-text-secondary tracking-wider">LIVE ANALYSIS</span>
+          <span className="font-mono text-xs text-text-secondary tracking-wider">LIVE MATCH ANALYSIS</span>
         </div>
 
         {/* Confidence */}
         {keypoints && (
           <div className="absolute top-3 right-3 bg-bg/80 backdrop-blur-sm rounded px-2 py-1">
             <span className="font-mono text-xs text-text-secondary">
-              POSE {(keypoints.confidence * 100).toFixed(0)}%
+              TRACK {(keypoints.confidence * 100).toFixed(0)}%
             </span>
           </div>
         )}

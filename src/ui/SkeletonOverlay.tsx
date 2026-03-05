@@ -35,20 +35,22 @@ const JOINT_KEYS: (keyof FilteredKeypoints)[] = [
 ];
 
 const FEATURE_JOINT_MAP: Record<string, (keyof FilteredKeypoints)[]> = {
-  'L Knee Flexion': ['leftKnee'],
-  'R Knee Flexion': ['rightKnee'],
-  'Knee Flex. Asym.': ['leftKnee', 'rightKnee'],
-  'L Hip Flexion': ['leftHip'],
-  'R Hip Flexion': ['rightHip'],
-  'Hip Flex. Asym.': ['leftHip', 'rightHip'],
-  'L Ankle Dorsiflex.': ['leftAnkle'],
-  'R Ankle Dorsiflex.': ['rightAnkle'],
+  'L Load Angle': ['leftKnee'],
+  'R Load Angle': ['rightKnee'],
+  'Load Asym.': ['leftKnee', 'rightKnee'],
+  'L Hip Drive': ['leftHip'],
+  'R Hip Drive': ['rightHip'],
+  'Hip Drive Asym.': ['leftHip', 'rightHip'],
+  'L Ankle Spring': ['leftAnkle'],
+  'R Ankle Spring': ['rightAnkle'],
   'Ankle Asym.': ['leftAnkle', 'rightAnkle'],
   'Stride Len. L': ['leftHeel', 'leftFootIndex'],
   'Stride Len. R': ['rightHeel', 'rightFootIndex'],
+  'Stride Compression': ['leftHeel', 'rightHeel', 'leftFootIndex', 'rightFootIndex'],
   'Ground Contact L': ['leftFootIndex', 'leftHeel'],
   'Ground Contact R': ['rightFootIndex', 'rightHeel'],
-  'Trunk Lean': ['leftShoulder', 'rightShoulder'],
+  'Contact Asym.': ['leftFootIndex', 'rightFootIndex', 'leftHeel', 'rightHeel'],
+  'Forward Lean': ['leftShoulder', 'rightShoulder'],
   'Lat. Trunk Tilt': ['leftShoulder', 'rightShoulder'],
 };
 
@@ -112,6 +114,8 @@ export default function SkeletonOverlay({ keypoints, contributingFeatures, width
     const rightHip = getPos('rightHip');
     const leftAnkle = getPos('leftAnkle');
     const rightAnkle = getPos('rightAnkle');
+    const leftFoot = getPos('leftFootIndex');
+    const rightFoot = getPos('rightFootIndex');
 
     // Draw a lightweight torso + head so the silhouette reads as a person.
     if (leftShoulder && rightShoulder && leftHip && rightHip) {
@@ -190,6 +194,31 @@ export default function SkeletonOverlay({ keypoints, contributingFeatures, width
         ctx.lineTo(rightWrist.x * width, rightWrist.y * height);
         ctx.stroke();
       }
+    }
+
+    if (leftFoot && rightFoot) {
+      const midX = (leftFoot.x + rightFoot.x) / 2;
+      const baseY = Math.max(leftFoot.y, rightFoot.y);
+      const swingBias = clamp((leftFoot.x - rightFoot.x) * 0.4, -0.02, 0.02);
+      const ballX = (midX + swingBias) * width;
+      const ballY = Math.min(height - 16, baseY * height + 6);
+
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#f5f7fb';
+      ctx.globalAlpha = 0.95;
+      ctx.fill();
+      ctx.strokeStyle = '#0f1720';
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = 0.75;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, 10, 0, Math.PI * 2);
+      ctx.strokeStyle = '#f5f7fb';
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.12;
+      ctx.stroke();
     }
 
     // Draw connections

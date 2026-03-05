@@ -73,8 +73,11 @@ export default function App() {
         marketImpact: {
           playerPropDirection: 'under',
           magnitudeEstimate: frame.anomalyResult.compositeScore > 0.6 ? 'major' : 'moderate',
-          affectedMarkets: ['Points O/U', 'PRA', 'Team Spread'],
-          estimatedPossessionsToImpact: Math.round(12 - frame.anomalyResult.compositeScore * 8),
+          affectedMarkets: ['Anytime Scorer', 'Shots On Target', 'Team Total Goals'],
+          estimatedPhasesToImpact: Math.max(
+            1,
+            Math.round(8 - frame.anomalyResult.compositeScore * 5),
+          ),
         },
         topFeatures: frame.anomalyResult.contributingFeatures.slice(0, 3),
       };
@@ -90,7 +93,7 @@ export default function App() {
           playerPropDirection: 'neutral',
           magnitudeEstimate: 'minor',
           affectedMarkets: [],
-          estimatedPossessionsToImpact: 0,
+          estimatedPhasesToImpact: 0,
         },
         topFeatures: [],
       };

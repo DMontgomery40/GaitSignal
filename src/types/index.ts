@@ -188,7 +188,7 @@ export interface MarketImpact {
   playerPropDirection: 'under' | 'neutral';
   magnitudeEstimate: 'minor' | 'moderate' | 'major';
   affectedMarkets: string[];
-  estimatedPossessionsToImpact: number;
+  estimatedPhasesToImpact: number;
 }
 
 export interface SignalEvent {
@@ -270,25 +270,25 @@ export interface DemoFrame {
 // --- Feature vector index constants ---
 
 export const FEATURE_NAMES: readonly string[] = [
-  'L Knee Flexion',
-  'R Knee Flexion',
-  'Knee Flex. Asym.',
-  'L Hip Flexion',
-  'R Hip Flexion',
-  'Hip Flex. Asym.',
-  'L Ankle Dorsiflex.',
-  'R Ankle Dorsiflex.',
+  'L Load Angle',
+  'R Load Angle',
+  'Load Asym.',
+  'L Hip Drive',
+  'R Hip Drive',
+  'Hip Drive Asym.',
+  'L Ankle Spring',
+  'R Ankle Spring',
   'Ankle Asym.',
   'Stride Len. L',
   'Stride Len. R',
-  'Stride Len. Asym.',
+  'Stride Compression',
   'Stride Time L',
   'Stride Time R',
-  'Stride Time Asym.',
+  'Cadence Asym.',
   'Ground Contact L',
   'Ground Contact R',
-  'Ground Contact Asym.',
-  'Trunk Lean',
+  'Contact Asym.',
+  'Forward Lean',
   'Lat. Trunk Tilt',
 ] as const;
 

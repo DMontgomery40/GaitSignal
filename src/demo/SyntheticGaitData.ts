@@ -676,7 +676,7 @@ export function generateScenarioFrames(
 }
 
 /**
- * Generate a transient spike sequence for the Tatum scenario.
+ * Generate a transient spike sequence for the short-lived contact scenario.
  * Normal -> spike for a few steps -> back to normal.
  */
 export function generateTransientSpikeFrames(

@@ -4,9 +4,9 @@
 
 import type { PlayerProfileJSON } from '../types/index.ts';
 
-import sgaProfile from './data/player-sga.json';
-import jokicProfile from './data/player-jokic.json';
-import tatumProfile from './data/player-tatum.json';
+import sakaProfile from './data/player-saka.json';
+import pedriProfile from './data/player-pedri.json';
+import musialaProfile from './data/player-musiala.json';
 
 // Feature vector order (all 20 elements):
 //  0: L knee flexion peak (deg)
@@ -30,14 +30,14 @@ import tatumProfile from './data/player-tatum.json';
 // 18: Trunk lean (deg)
 // 19: Lateral trunk tilt (deg)
 
-export const SGA_PROFILE: PlayerProfileJSON = sgaProfile as PlayerProfileJSON;
-export const JOKIC_PROFILE: PlayerProfileJSON = jokicProfile as PlayerProfileJSON;
-export const TATUM_PROFILE: PlayerProfileJSON = tatumProfile as PlayerProfileJSON;
+export const SAKA_PROFILE: PlayerProfileJSON = sakaProfile as PlayerProfileJSON;
+export const PEDRI_PROFILE: PlayerProfileJSON = pedriProfile as PlayerProfileJSON;
+export const MUSIALA_PROFILE: PlayerProfileJSON = musialaProfile as PlayerProfileJSON;
 
 const PROFILES: Record<string, PlayerProfileJSON> = {
-  sga: SGA_PROFILE,
-  jokic: JOKIC_PROFILE,
-  tatum: TATUM_PROFILE,
+  saka: SAKA_PROFILE,
+  pedri: PEDRI_PROFILE,
+  musiala: MUSIALA_PROFILE,
 };
 
 export function getProfile(playerId: string): PlayerProfileJSON {

@@ -44,7 +44,7 @@ interface SparklineConfig {
 
 const SPARKLINES: SparklineConfig[] = [
   {
-    label: 'KNEE FLEX. ASYM.',
+    label: 'LOAD ASYM.',
     dataKey: 'kneeAsym',
     color: '#00f0ff',
     domain: [0, 20],
@@ -52,7 +52,7 @@ const SPARKLINES: SparklineConfig[] = [
     thresholds: [{ value: 8, color: '#ffb800' }],
   },
   {
-    label: 'STRIDE LEN. ASYM.',
+    label: 'STRIDE COMPRESSION',
     dataKey: 'strideAsym',
     color: '#00f0ff',
     domain: [0, 20],
@@ -206,7 +206,7 @@ export default function GaitTimeline({
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
         <span className="text-text-secondary font-mono text-xs tracking-widest uppercase">
-          Gait Metrics Timeline
+          Movement Metrics Timeline
         </span>
         <span className="text-text-secondary font-mono text-xs">
           {formatTime(currentTimestampMs)}

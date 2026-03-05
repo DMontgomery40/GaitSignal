@@ -1,0 +1,32 @@
+{
+  "player": {
+    "name": "Bukayo Saka",
+    "team": "Arsenal",
+    "position": "RW",
+    "height": "5'10\"",
+    "weight": "159 lbs",
+    "jerseyNumber": 7
+  },
+  "baselineMean": [
+    43.6,  42.9,  1.9,
+    39.1,  38.5,  2.2,
+    19.8,  19.3,  2.6,
+    1.19,  1.18,  2.1,
+    362,   358,   1.5,
+    176,   173,   2.8,
+    6.2,   1.0
+  ],
+  "baselineStdDev": [
+    2.3,   2.2,   0.8,
+    2.1,   2.0,   0.9,
+    1.4,   1.4,   0.9,
+    0.05,  0.05,  0.8,
+    15,    14,    0.7,
+    10,    9,     1.0,
+    1.2,   0.6
+  ],
+  "gamesInBaseline": 166,
+  "lastBaselineUpdate": "2026-03-03",
+  "modelVersion": "GaitSignal-Saka-v4.0",
+  "modelParams": "72M params | Retrained: 2026-03-03"
+}

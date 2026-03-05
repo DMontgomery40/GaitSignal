@@ -181,19 +181,19 @@ export class SignalEmitter {
     const hasStride = [...featureIndices].some((i) => strideFeatures.has(i));
 
     if (hasLowerBody) {
-      affectedMarkets.push('points', 'PRA');
+      affectedMarkets.push('Anytime Scorer', 'Shots On Target');
     }
     if (hasStride) {
-      affectedMarkets.push('rebounds', 'team_spread');
+      affectedMarkets.push('Next Goal', 'Team Total Goals');
     }
     if (affectedMarkets.length === 0) {
-      affectedMarkets.push('points');
+      affectedMarkets.push('Match Odds');
     }
 
-    // Estimate possessions to impact: higher score = sooner impact
-    const estimatedPossessionsToImpact = Math.max(
-      3,
-      Math.round(20 - score * 15),
+    // Estimate attacking phases to impact: higher score = sooner impact
+    const estimatedPhasesToImpact = Math.max(
+      1,
+      Math.round(8 - score * 5),
     );
 
     // Direction is always "under" for gait anomalies (performance degradation)
@@ -204,7 +204,7 @@ export class SignalEmitter {
       playerPropDirection,
       magnitudeEstimate,
       affectedMarkets,
-      estimatedPossessionsToImpact,
+      estimatedPhasesToImpact,
     };
   }
 }
