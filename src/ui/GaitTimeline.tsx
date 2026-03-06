@@ -7,24 +7,56 @@ import {
   ReferenceLine,
   CartesianGrid,
 } from 'recharts';
-import type { GaitMetricsSnapshot, AnomalyResult, SignalEvent } from '../types/index.ts';
+import type { GaitMetricsSnapshot, PricingEdge, EdgeEvent } from '../types/index.ts';
 
 interface GaitTimelineProps {
   gaitHistory: GaitMetricsSnapshot[];
-  anomalyHistory: AnomalyResult[];
-  signalEvents: SignalEvent[];
+  pricingHistory: PricingEdge[];
+  edgeEvents: EdgeEvent[];
   currentTimestampMs: number;
-  onSeek?: (timestampMs: number) => void;
 }
 
 interface ChartDataPoint {
   time: number;
-  timeLabel: string;
-  kneeAsym: number;
-  strideAsym: number;
-  contactAsym: number;
-  anomalyScore: number;
+  movementSurprise: number;
+  contextGate: number;
+  edgeScore: number;
+  sourceConfidence: number;
 }
+
+interface SparklineConfig {
+  label: string;
+  dataKey: keyof ChartDataPoint;
+  color: string;
+  thresholds?: number[];
+}
+
+const SPARKLINES: SparklineConfig[] = [
+  {
+    label: 'MOVEMENT SURPRISE',
+    dataKey: 'movementSurprise',
+    color: '#00f0ff',
+    thresholds: [0.35, 0.58],
+  },
+  {
+    label: 'CONTEXT GATE',
+    dataKey: 'contextGate',
+    color: '#7ce3b0',
+    thresholds: [0.5, 0.72],
+  },
+  {
+    label: 'EDGE SCORE',
+    dataKey: 'edgeScore',
+    color: '#ffb800',
+    thresholds: [0.28, 0.56],
+  },
+  {
+    label: 'SOURCE CONFIDENCE',
+    dataKey: 'sourceConfidence',
+    color: '#ff3344',
+    thresholds: [0.74, 0.8],
+  },
+];
 
 function formatTime(ms: number): string {
   const sec = Math.floor(ms / 1000);
@@ -33,63 +65,16 @@ function formatTime(ms: number): string {
   return `${min}:${s.toString().padStart(2, '0')}`;
 }
 
-interface SparklineConfig {
-  label: string;
-  dataKey: keyof ChartDataPoint;
-  color: string;
-  domain: [number, number];
-  unit: string;
-  thresholds?: { value: number; color: string }[];
-}
-
-const SPARKLINES: SparklineConfig[] = [
-  {
-    label: 'LOAD ASYM.',
-    dataKey: 'kneeAsym',
-    color: '#00f0ff',
-    domain: [0, 20],
-    unit: '%',
-    thresholds: [{ value: 8, color: '#ffb800' }],
-  },
-  {
-    label: 'STRIDE COMPRESSION',
-    dataKey: 'strideAsym',
-    color: '#00f0ff',
-    domain: [0, 20],
-    unit: '%',
-    thresholds: [{ value: 8, color: '#ffb800' }],
-  },
-  {
-    label: 'GROUND CONTACT ASYM.',
-    dataKey: 'contactAsym',
-    color: '#00f0ff',
-    domain: [0, 20],
-    unit: '%',
-    thresholds: [{ value: 8, color: '#ffb800' }],
-  },
-  {
-    label: 'ANOMALY SCORE',
-    dataKey: 'anomalyScore',
-    color: '#00f0ff',
-    domain: [0, 1],
-    unit: '',
-    thresholds: [
-      { value: 0.3, color: '#ffb800' },
-      { value: 0.5, color: '#ff3344' },
-    ],
-  },
-];
-
 function Sparkline({
   data,
   config,
   currentTime,
-  signalEvents,
+  edgeEvents,
 }: {
   data: ChartDataPoint[];
   config: SparklineConfig;
   currentTime: number;
-  signalEvents: SignalEvent[];
+  edgeEvents: EdgeEvent[];
 }) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
@@ -108,22 +93,14 @@ function Sparkline({
     return () => observer.disconnect();
   }, []);
 
-  const latestValue = data.length > 0 ? data[data.length - 1][config.dataKey] : 0;
-  const numValue = typeof latestValue === 'number' ? latestValue : 0;
-
-  let valueColor = config.color;
-  if (config.thresholds) {
-    for (const t of config.thresholds) {
-      if (numValue >= t.value) valueColor = t.color;
-    }
-  }
+  const latest = data.length > 0 ? data[data.length - 1][config.dataKey] : 0;
 
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between px-1">
         <span className="text-text-secondary font-mono text-xs tracking-wider">{config.label}</span>
-        <span className="font-mono text-sm font-semibold" style={{ color: valueColor }}>
-          {numValue.toFixed(config.dataKey === 'anomalyScore' ? 2 : 1)}{config.unit}
+        <span className="font-mono text-sm font-semibold" style={{ color: config.color }}>
+          {latest.toFixed(2)}
         </span>
       </div>
       <div ref={chartContainerRef} className="h-16 w-full min-w-0">
@@ -136,22 +113,22 @@ function Sparkline({
               vertical={false}
             />
             <XAxis dataKey="time" hide />
-            <YAxis domain={config.domain} hide />
-            {config.thresholds?.map((t, i) => (
+            <YAxis domain={[0, 1]} hide />
+            {config.thresholds?.map((value) => (
               <ReferenceLine
-                key={i}
-                y={t.value}
-                stroke={t.color}
+                key={value}
+                y={value}
+                stroke={value >= 0.56 || value >= 0.8 ? '#ff3344' : '#ffb800'}
                 strokeDasharray="4 4"
-                strokeOpacity={0.4}
+                strokeOpacity={0.32}
               />
             ))}
             <ReferenceLine x={currentTime} stroke="#6b6b80" strokeWidth={1} />
-            {signalEvents.map((evt, i) => (
+            {edgeEvents.map((event) => (
               <ReferenceLine
-                key={`evt-${i}`}
-                x={evt.timestampMs}
-                stroke={evt.type === 'signal_actionable' ? '#ff3344' : '#ffb800'}
+                key={`${event.type}-${event.timestampMs}`}
+                x={event.timestampMs}
+                stroke={event.type === 'edge_priceable' ? '#ff3344' : '#ffb800'}
                 strokeWidth={1}
                 strokeDasharray="2 2"
               />
@@ -160,7 +137,7 @@ function Sparkline({
               type="monotone"
               dataKey={config.dataKey}
               stroke={config.color}
-              strokeWidth={1.5}
+              strokeWidth={1.6}
               dot={false}
               isAnimationActive={false}
             />
@@ -173,8 +150,8 @@ function Sparkline({
 
 export default function GaitTimeline({
   gaitHistory,
-  anomalyHistory,
-  signalEvents,
+  pricingHistory,
+  edgeEvents,
   currentTimestampMs,
 }: GaitTimelineProps) {
   const data = useMemo<ChartDataPoint[]>(() => {
@@ -182,35 +159,39 @@ export default function GaitTimeline({
     const startMs = Math.max(0, currentTimestampMs - windowMs);
 
     return gaitHistory
-      .filter((g) => g.timestampMs >= startMs && g.timestampMs <= currentTimestampMs)
-      .map((g) => {
-        const anomaly = anomalyHistory.find((a) => a.timestampMs === g.timestampMs);
+      .map((frame, index) => ({ frame, edge: pricingHistory[index] }))
+      .filter(({ frame }) => frame.timestampMs >= startMs && frame.timestampMs <= currentTimestampMs)
+      .map(({ frame, edge }) => {
         return {
-          time: g.timestampMs,
-          timeLabel: formatTime(g.timestampMs),
-          kneeAsym: g.symmetry.kneeFlexionAsymmetry,
-          strideAsym: g.symmetry.strideLengthAsymmetry,
-          contactAsym: g.symmetry.groundContactAsymmetry,
-          anomalyScore: anomaly?.compositeScore ?? 0,
+          time: frame.timestampMs,
+          movementSurprise: edge?.movementSurprise ?? 0,
+          contextGate: edge?.contextGate ?? 0,
+          edgeScore: edge?.edgeScore ?? 0,
+          sourceConfidence: edge?.sourceConfidence ?? 0,
         };
       });
-  }, [gaitHistory, anomalyHistory, currentTimestampMs]);
+  }, [gaitHistory, pricingHistory, currentTimestampMs]);
 
   const visibleEvents = useMemo(() => {
     const windowMs = 60000;
     const startMs = Math.max(0, currentTimestampMs - windowMs);
-    return signalEvents.filter((e) => e.timestampMs >= startMs && e.timestampMs <= currentTimestampMs);
-  }, [signalEvents, currentTimestampMs]);
+    return edgeEvents.filter((event) => event.timestampMs >= startMs && event.timestampMs <= currentTimestampMs);
+  }, [edgeEvents, currentTimestampMs]);
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
         <span className="text-text-secondary font-mono text-xs tracking-widest uppercase">
-          Movement Metrics Timeline
+          Pricing Workflow Timeline
         </span>
         <span className="text-text-secondary font-mono text-xs">
           {formatTime(currentTimestampMs)}
         </span>
+      </div>
+      <div className="rounded border border-border bg-bg/60 px-3 py-2">
+        <p className="text-text-secondary font-sans text-xs leading-relaxed">
+          Movement surprise stays primary, but the edge only opens when venue context and feed confidence agree.
+        </p>
       </div>
       <div className="flex flex-col gap-4">
         {SPARKLINES.map((config) => (
@@ -219,7 +200,7 @@ export default function GaitTimeline({
             data={data}
             config={config}
             currentTime={currentTimestampMs}
-            signalEvents={visibleEvents}
+            edgeEvents={visibleEvents}
           />
         ))}
       </div>

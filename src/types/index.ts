@@ -16,6 +16,15 @@ export interface Keypoint extends Point3D {
   name: string;
 }
 
+export interface PoseDisplayLandmark extends Point3D {
+  visibility: number;
+}
+
+export interface PoseDisplayContourPoint {
+  x: number;
+  y: number;
+}
+
 // --- Pose (Worker 1) ---
 
 export interface PoseResult {
@@ -169,37 +178,6 @@ export interface DeviationReport {
   overallDeviation: number;
 }
 
-export type SignalStateType = 'monitoring' | 'alert' | 'confirmed' | 'actionable';
-
-export interface SignalState {
-  current: SignalStateType;
-  enteredAt: number;
-  consecutiveStridesAboveThreshold: number;
-  lastAnomalyResult: AnomalyResult | null;
-}
-
-export type SignalEventType =
-  | 'alert_triggered'
-  | 'signal_confirmed'
-  | 'signal_actionable'
-  | 'signal_cleared';
-
-export interface MarketImpact {
-  playerPropDirection: 'under' | 'neutral';
-  magnitudeEstimate: 'minor' | 'moderate' | 'major';
-  affectedMarkets: string[];
-  estimatedPhasesToImpact: number;
-}
-
-export interface SignalEvent {
-  timestampMs: number;
-  type: SignalEventType;
-  anomalyScore: number;
-  confidence: number;
-  marketImpact: MarketImpact;
-  topFeatures: FeatureContribution[];
-}
-
 // --- Player Profiles (Worker 5 creates, Worker 3 consumes) ---
 
 export interface PlayerInfo {
@@ -241,9 +219,144 @@ export interface NarrativeOverlay {
   type: 'context' | 'detection' | 'result';
 }
 
-export interface SignalTimelineEntry {
-  state: SignalStateType;
+export type PoseSegmentId = 'steadyCarry' | 'hardPlant' | 'guardedRecovery';
+
+export interface ScenarioPoseCue {
   startTimestampMs: number;
+  segmentId: PoseSegmentId;
+  playbackRate?: number;
+  strideScale?: number;
+  leanBias?: number;
+}
+
+export interface PoseClipSource {
+  title: string;
+  pageUrl: string;
+  mediaUrl: string;
+  licenseName: string;
+  licenseUrl: string;
+  creator: string;
+  notes: string;
+}
+
+export interface PoseClipSegment {
+  startFrame: number;
+  endFrame: number;
+  notes?: string;
+}
+
+export interface PoseDisplayFrame {
+  timestampMs: number;
+  frameIndex: number;
+  confidence: number;
+  landmarks: PoseDisplayLandmark[];
+  silhouette: PoseDisplayContourPoint[] | null;
+  segmentId: PoseSegmentId;
+  segmentTimeMs: number;
+  ballAnchor: Point3D | null;
+}
+
+export interface PoseClipAsset {
+  id: string;
+  label: string;
+  fps: number;
+  width: number;
+  height: number;
+  frameCount: number;
+  source: PoseClipSource;
+  segments: Record<PoseSegmentId, PoseClipSegment>;
+  frames: PoseDisplayFrame[];
+}
+
+export interface PitchCoordinate {
+  x: number;
+  y: number;
+}
+
+export type PossessionState = 'player_team' | 'opponent' | 'contested';
+export type BallAccessType = 'far' | 'support' | 'involved' | 'on_ball';
+export type PitchZoneType =
+  | 'defensive-third'
+  | 'middle-third'
+  | 'left-wing'
+  | 'right-wing'
+  | 'half-space'
+  | 'final-third'
+  | 'box-edge';
+export type PhaseOfPlayType =
+  | 'defensive-recovery'
+  | 'transition-attack'
+  | 'settled-attack'
+  | 'high-press'
+  | 'counterpress'
+  | 'ball-carry';
+export type RoleDemandType = 'low' | 'moderate' | 'high' | 'extreme';
+export type MarketUrgencyType = 'watch' | 'active' | 'immediate';
+
+export interface FootballContextKeyframe {
+  startTimestampMs: number;
+  playerPosition: PitchCoordinate;
+  ballPosition: PitchCoordinate;
+  possession: PossessionState;
+  ballAccess: BallAccessType;
+  pitchZone: PitchZoneType;
+  phaseOfPlay: PhaseOfPlayType;
+  roleDemand: RoleDemandType;
+  sourceConfidence: number;
+  marketUrgency: MarketUrgencyType;
+  marketFamily: string[];
+  feedLabel: string;
+  note: string;
+}
+
+export interface FootballContext {
+  timestampMs: number;
+  playerPosition: PitchCoordinate;
+  ballPosition: PitchCoordinate;
+  possession: PossessionState;
+  ballAccess: BallAccessType;
+  ballDistanceMeters: number;
+  pitchZone: PitchZoneType;
+  phaseOfPlay: PhaseOfPlayType;
+  roleDemand: RoleDemandType;
+  sourceConfidence: number;
+  marketUrgency: MarketUrgencyType;
+  marketFamily: string[];
+  feedLabel: string;
+  note: string;
+}
+
+export type EdgeStateType = 'monitoring' | 'warming' | 'confirmed' | 'priceable';
+
+export interface PricingEdge {
+  edgeScore: number;
+  edgeState: EdgeStateType;
+  stateEnteredAt: number;
+  qualifiedStrides: number;
+  movementSurprise: number;
+  contextGate: number;
+  sourceConfidence: number;
+  marketFamily: string[];
+  timeToMarketImpact: number;
+  rationale: string[];
+}
+
+export type EdgeEventType =
+  | 'edge_opened'
+  | 'edge_confirmed'
+  | 'edge_priceable'
+  | 'edge_cleared';
+
+export interface EdgeEvent {
+  timestampMs: number;
+  type: EdgeEventType;
+  edgeScore: number;
+  movementSurprise: number;
+  contextGate: number;
+  sourceConfidence: number;
+  marketFamily: string[];
+  timeToMarketImpact: number;
+  topFeatures: FeatureContribution[];
 }
 
 export interface ScenarioInfo {
@@ -254,42 +367,45 @@ export interface ScenarioInfo {
   durationMs: number;
   anomalyConfig: AnomalyConfig | null;
   narrativeOverlays: NarrativeOverlay[];
-  signalTimeline?: SignalTimelineEntry[];
+  contextTimeline: FootballContextKeyframe[];
+  poseTimeline: ScenarioPoseCue[];
 }
 
 export interface DemoFrame {
   timestampMs: number;
   frameIndex: number;
   keypoints: FilteredKeypoints;
+  displayPose: PoseDisplayFrame;
   gaitMetrics: GaitMetricsSnapshot;
   anomalyResult: AnomalyResult;
-  signalState: SignalState;
+  footballContext: FootballContext;
+  pricingEdge: PricingEdge;
   narrativeOverlay: NarrativeOverlay | null;
 }
 
 // --- Feature vector index constants ---
 
 export const FEATURE_NAMES: readonly string[] = [
-  'L Load Angle',
-  'R Load Angle',
-  'Load Asym.',
+  'L Knee Load',
+  'R Knee Load',
+  'Knee Load Asym.',
   'L Hip Drive',
   'R Hip Drive',
   'Hip Drive Asym.',
   'L Ankle Spring',
   'R Ankle Spring',
-  'Ankle Asym.',
-  'Stride Len. L',
-  'Stride Len. R',
+  'Ankle Spring Asym.',
+  'Stride Length L',
+  'Stride Length R',
   'Stride Compression',
   'Stride Time L',
   'Stride Time R',
   'Cadence Asym.',
   'Ground Contact L',
   'Ground Contact R',
-  'Contact Asym.',
+  'Ground Contact Asym.',
   'Forward Lean',
-  'Lat. Trunk Tilt',
+  'Lateral Tilt',
 ] as const;
 
 export const FEATURE_COUNT = 20;

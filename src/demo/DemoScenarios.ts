@@ -1,13 +1,14 @@
 // ============================================================
-// DemoScenarios - Three pre-built demo scenarios
+// DemoScenarios - Three football-native pricing edge scenarios
 // ============================================================
 
 import type {
   ScenarioInfo,
   AnomalyConfig,
   NarrativeOverlay,
-  SignalTimelineEntry,
   DemoFrame,
+  FootballContextKeyframe,
+  ScenarioPoseCue,
 } from '../types/index.ts';
 import { SAKA_PROFILE, PEDRI_PROFILE, MUSIALA_PROFILE } from './PlayerProfiles.ts';
 import {
@@ -16,246 +17,370 @@ import {
 } from './SyntheticGaitData.ts';
 import type { GeneratedScenarioData } from './SyntheticGaitData.ts';
 
-// --- Scenario 1: "Saka Touchline Guarding" ---
-
 const sakaNarratives: NarrativeOverlay[] = [
   {
     timestampMs: 0,
-    durationMs: 5000,
-    text: 'Saka tracking back in defensive transition - normal movement envelope. Model in MONITORING state.',
-    type: 'context',
-  },
-  {
-    timestampMs: 20000,
-    durationMs: 5000,
-    text: 'Baseline movement signature stable. Load angle, contact time, and stride compression all within one standard deviation.',
+    durationMs: 6000,
+    text: 'Contracted in-stadium tracking shows Saka in defensive recovery. The player-specific movement model is quiet and no pricing edge is open.',
     type: 'context',
   },
   {
     timestampMs: 40000,
-    durationMs: 6000,
-    text: 'Long recovery sprint on the touchline, then a hard deceleration. Nothing obvious on the broadcast feed.',
-    type: 'context',
-  },
-  {
-    timestampMs: 50000,
-    durationMs: 6000,
-    text: 'Right-side load angle softening. Contact asymmetry ticking up. Still below confirmation threshold.',
+    durationMs: 7000,
+    text: 'A long recovery sprint and hard touchline deceleration lift the movement-surprise proxy. Arsenal are still out of possession, so the edge stays suppressed.',
     type: 'detection',
   },
   {
     timestampMs: 60000,
-    durationMs: 5000,
-    text: 'ALERT triggered. Right-side contact asymmetry reaches 5.9% against a 2.1% baseline. Rate of change is accelerating.',
-    type: 'detection',
-  },
-  {
-    timestampMs: 72000,
-    durationMs: 5000,
-    text: 'Multiple correlated shifts now agree: hip drive, contact time, and stride compression are all leaning the same direction.',
-    type: 'detection',
-  },
-  {
-    timestampMs: 80000,
-    durationMs: 6000,
-    text: 'Signal CONFIRMED. Eight consecutive strides above threshold. Confidence: 0.74.',
-    type: 'detection',
-  },
-  {
-    timestampMs: 95000,
-    durationMs: 8000,
-    text: 'ACTIONABLE signal emitted. Score: 0.63, Confidence: 0.79. Markets affected: Anytime Scorer, Shots On Target, Team Total Goals.',
-    type: 'result',
-  },
-  {
-    timestampMs: 110000,
     durationMs: 7000,
-    text: 'Saka stays on the pitch, but top-speed actions flatten. Score stabilizes between 0.56 and 0.66.',
+    text: 'WARMING state. The model keeps seeing right-side drift, but the football context gate is still too weak to price aggressively.',
+    type: 'detection',
+  },
+  {
+    timestampMs: 76000,
+    durationMs: 7000,
+    text: 'Arsenal threaten the turnover. Saka becomes the immediate wide outlet and the context gate starts to agree with the movement surprise.',
     type: 'context',
   },
   {
-    timestampMs: 130000,
+    timestampMs: 92000,
     durationMs: 7000,
-    text: 'GaitSignal flagged the change 47 seconds before commentary mentioned he was stretching his hamstring.',
+    text: 'PRICEABLE edge. Same movement issue, different football meaning: now it sits on a live attacking responsibility window.',
     type: 'result',
   },
   {
-    timestampMs: 142000,
-    durationMs: 5000,
-    text: 'Arsenal move him wider and reduce recovery runs. Broadcast still frames it as precautionary.',
+    timestampMs: 126000,
+    durationMs: 8000,
+    text: 'Arsenal keep Saka wider and reduce repeat recovery demands. The model stays elevated, but the pricing edge compresses with the role change.',
     type: 'result',
   },
 ];
 
 const sakaAnomalyConfig: AnomalyConfig = {
   type: 'hip_compensation',
-  onsetTimestampMs: 40000,
-  rampDurationMs: 13000,
+  onsetTimestampMs: 38000,
+  rampDurationMs: 14000,
   peakSeverity: 1.0,
   affectedSide: 'right',
   affectedFeatures: [1, 2, 4, 5, 10, 11, 15, 16, 17, 18],
 };
 
-const sakaSignalTimeline: SignalTimelineEntry[] = [
-  { state: 'monitoring', startTimestampMs: 0 },
-  { state: 'alert', startTimestampMs: 60000 },
-  { state: 'confirmed', startTimestampMs: 80000 },
-  { state: 'actionable', startTimestampMs: 95000 },
+const sakaContextTimeline: FootballContextKeyframe[] = [
+  {
+    startTimestampMs: 0,
+    playerPosition: { x: 34, y: 8 },
+    ballPosition: { x: 58, y: 31 },
+    possession: 'opponent',
+    ballAccess: 'far',
+    pitchZone: 'defensive-third',
+    phaseOfPlay: 'defensive-recovery',
+    roleDemand: 'high',
+    sourceConfidence: 0.93,
+    marketUrgency: 'watch',
+    marketFamily: ['Saka shots', 'Arsenal team total', 'Next Arsenal attack'],
+    feedLabel: 'TRACAB + synced event feed',
+    note: 'Out of possession recovery run.',
+  },
+  {
+    startTimestampMs: 40000,
+    playerPosition: { x: 42, y: 6 },
+    ballPosition: { x: 61, y: 24 },
+    possession: 'opponent',
+    ballAccess: 'far',
+    pitchZone: 'left-wing',
+    phaseOfPlay: 'defensive-recovery',
+    roleDemand: 'high',
+    sourceConfidence: 0.92,
+    marketUrgency: 'watch',
+    marketFamily: ['Saka shots', 'Arsenal team total', 'Next Arsenal attack'],
+    feedLabel: 'TRACAB + synced event feed',
+    note: 'Drift appears but Arsenal are still chasing the phase.',
+  },
+  {
+    startTimestampMs: 76000,
+    playerPosition: { x: 59, y: 10 },
+    ballPosition: { x: 56, y: 16 },
+    possession: 'contested',
+    ballAccess: 'support',
+    pitchZone: 'half-space',
+    phaseOfPlay: 'transition-attack',
+    roleDemand: 'high',
+    sourceConfidence: 0.94,
+    marketUrgency: 'active',
+    marketFamily: ['Saka shots', 'Arsenal team total', 'Next Arsenal attack'],
+    feedLabel: 'TRACAB + synced event feed',
+    note: 'Turnover threat raises the value of any movement drop-off.',
+  },
+  {
+    startTimestampMs: 92000,
+    playerPosition: { x: 74, y: 12 },
+    ballPosition: { x: 77, y: 14 },
+    possession: 'player_team',
+    ballAccess: 'involved',
+    pitchZone: 'final-third',
+    phaseOfPlay: 'settled-attack',
+    roleDemand: 'extreme',
+    sourceConfidence: 0.95,
+    marketUrgency: 'immediate',
+    marketFamily: ['Saka shots', 'Arsenal team total', 'Anytime involvement'],
+    feedLabel: 'TRACAB + synced event feed',
+    note: 'Attacking responsibility is now live on the same degraded movement pattern.',
+  },
+  {
+    startTimestampMs: 126000,
+    playerPosition: { x: 78, y: 5 },
+    ballPosition: { x: 63, y: 28 },
+    possession: 'player_team',
+    ballAccess: 'far',
+    pitchZone: 'left-wing',
+    phaseOfPlay: 'settled-attack',
+    roleDemand: 'moderate',
+    sourceConfidence: 0.94,
+    marketUrgency: 'active',
+    marketFamily: ['Arsenal team total', 'Next Arsenal attack'],
+    feedLabel: 'TRACAB + synced event feed',
+    note: 'Role adjustment cools the edge even before the model fully normalizes.',
+  },
+];
+
+const sakaPoseTimeline: ScenarioPoseCue[] = [
+  { startTimestampMs: 0, segmentId: 'steadyCarry', playbackRate: 1.02, strideScale: 1.0 },
+  { startTimestampMs: 38000, segmentId: 'hardPlant', playbackRate: 0.96, strideScale: 0.98, leanBias: 0.01 },
+  { startTimestampMs: 60000, segmentId: 'guardedRecovery', playbackRate: 0.9, strideScale: 0.9, leanBias: 0.02 },
+  { startTimestampMs: 126000, segmentId: 'steadyCarry', playbackRate: 0.92, strideScale: 0.94, leanBias: 0.012 },
 ];
 
 const sakaScenarioInfo: ScenarioInfo = {
   id: 'saka-touchline-guarding',
-  name: 'Saka Touchline Guarding',
+  name: 'Saka Recovery-Run Reprice',
   description:
-    'Primary demo. Subtle right-side guarding after a long recovery sprint. Model catches it 47 seconds before commentary.',
+    'Movement drift is only priceable once Saka becomes the live wide outlet in an Arsenal attack.',
   playerProfile: SAKA_PROFILE,
   durationMs: 150000,
   anomalyConfig: sakaAnomalyConfig,
   narrativeOverlays: sakaNarratives,
-  signalTimeline: sakaSignalTimeline,
+  contextTimeline: sakaContextTimeline,
+  poseTimeline: sakaPoseTimeline,
 };
-
-// --- Scenario 2: "Pedri Pressing Drift" ---
 
 const pedriNarratives: NarrativeOverlay[] = [
   {
     timestampMs: 0,
     durationMs: 6000,
-    text: 'Seventy-first minute. Barcelona are still pressing high. Monitoring baseline.',
+    text: 'Pedri starts in a high-press phase. The feed stack is stable, role demand is heavy, and the edge engine is monitoring for sustained surprise.',
     type: 'context',
   },
   {
-    timestampMs: 20000,
-    durationMs: 5000,
-    text: 'Repeat accelerations are shortening. Contact times and forward lean are beginning to drift.',
-    type: 'context',
-  },
-  {
-    timestampMs: 40000,
-    durationMs: 6000,
-    text: 'Not an injury signal - workload accumulation. Pedri is conserving on second-wave presses.',
-    type: 'detection',
-  },
-  {
-    timestampMs: 60000,
-    durationMs: 5000,
-    text: 'ALERT state. Multiple movement features are drifting together. The onset is subtle but sustained.',
-    type: 'detection',
-  },
-  {
-    timestampMs: 80000,
-    durationMs: 6000,
-    text: 'Signal CONFIRMED at lower confidence (0.56). This reads like fatigue, not acute trauma.',
-    type: 'detection',
-  },
-  {
-    timestampMs: 95000,
+    timestampMs: 36000,
     durationMs: 7000,
-    text: 'ACTIONABLE for next-goal and team-total markets. Historical comps show chance creation usually drops first.',
+    text: 'Movement surprise climbs gradually: shorter repeat accelerations, longer contact, more forward lean. That alone is not enough.',
+    type: 'detection',
+  },
+  {
+    timestampMs: 65000,
+    durationMs: 7000,
+    text: 'WARMING state. Barcelona keep asking Pedri to counterpress and recycle, so the football context gate stays high instead of cooling the edge.',
+    type: 'detection',
+  },
+  {
+    timestampMs: 90000,
+    durationMs: 8000,
+    text: 'CONFIRMED edge. This is not an injury claim. It is a player-specific decay pattern during a role that still matters to live pricing.',
     type: 'result',
   },
   {
-    timestampMs: 110000,
-    durationMs: 6000,
-    text: 'This is where football video gets interesting - the model can separate sustained fatigue from one-off contact.',
+    timestampMs: 108000,
+    durationMs: 7000,
+    text: 'PRICEABLE edge. If the tactical demand dropped here, the edge would compress. It stays open because Barcelona keep the same workload on him.',
     type: 'result',
   },
 ];
 
 const pedriAnomalyConfig: AnomalyConfig = {
   type: 'fatigue_drift',
-  onsetTimestampMs: 15000,
-  rampDurationMs: 60000,
-  peakSeverity: 1.15,
+  onsetTimestampMs: 18000,
+  rampDurationMs: 65000,
+  peakSeverity: 1.18,
   affectedSide: 'bilateral',
   affectedFeatures: [0, 1, 9, 10, 12, 13, 15, 16, 18],
 };
 
-const pedriSignalTimeline: SignalTimelineEntry[] = [
-  { state: 'monitoring', startTimestampMs: 0 },
-  { state: 'alert', startTimestampMs: 60000 },
-  { state: 'confirmed', startTimestampMs: 80000 },
-  { state: 'actionable', startTimestampMs: 95000 },
+const pedriContextTimeline: FootballContextKeyframe[] = [
+  {
+    startTimestampMs: 0,
+    playerPosition: { x: 50, y: 31 },
+    ballPosition: { x: 59, y: 26 },
+    possession: 'opponent',
+    ballAccess: 'support',
+    pitchZone: 'middle-third',
+    phaseOfPlay: 'high-press',
+    roleDemand: 'high',
+    sourceConfidence: 0.94,
+    marketUrgency: 'active',
+    marketFamily: ['Next goal', 'Barcelona team total', 'Pedri involvement'],
+    feedLabel: 'Opta Vision sync + venue tracking',
+    note: 'Pressing load makes movement drift more commercially relevant.',
+  },
+  {
+    startTimestampMs: 36000,
+    playerPosition: { x: 56, y: 28 },
+    ballPosition: { x: 63, y: 24 },
+    possession: 'contested',
+    ballAccess: 'support',
+    pitchZone: 'half-space',
+    phaseOfPlay: 'counterpress',
+    roleDemand: 'extreme',
+    sourceConfidence: 0.95,
+    marketUrgency: 'active',
+    marketFamily: ['Next goal', 'Barcelona team total', 'Pedri involvement'],
+    feedLabel: 'Opta Vision sync + venue tracking',
+    note: 'Counterpressing keeps the context gate elevated as drift accumulates.',
+  },
+  {
+    startTimestampMs: 76000,
+    playerPosition: { x: 64, y: 26 },
+    ballPosition: { x: 67, y: 22 },
+    possession: 'player_team',
+    ballAccess: 'involved',
+    pitchZone: 'final-third',
+    phaseOfPlay: 'settled-attack',
+    roleDemand: 'high',
+    sourceConfidence: 0.95,
+    marketUrgency: 'immediate',
+    marketFamily: ['Next goal', 'Barcelona team total', 'Pedri involvement'],
+    feedLabel: 'Opta Vision sync + venue tracking',
+    note: 'The same fatigue pattern now sits inside an active attacking phase.',
+  },
+  {
+    startTimestampMs: 108000,
+    playerPosition: { x: 62, y: 24 },
+    ballPosition: { x: 70, y: 18 },
+    possession: 'player_team',
+    ballAccess: 'involved',
+    pitchZone: 'final-third',
+    phaseOfPlay: 'settled-attack',
+    roleDemand: 'high',
+    sourceConfidence: 0.94,
+    marketUrgency: 'immediate',
+    marketFamily: ['Barcelona team total', 'Pedri involvement', 'Next goal'],
+    feedLabel: 'Opta Vision sync + venue tracking',
+    note: 'Role demand remains high long enough for the edge to stay live.',
+  },
+];
+
+const pedriPoseTimeline: ScenarioPoseCue[] = [
+  { startTimestampMs: 0, segmentId: 'steadyCarry', playbackRate: 1.0, strideScale: 1.0 },
+  { startTimestampMs: 36000, segmentId: 'hardPlant', playbackRate: 0.92, strideScale: 0.96, leanBias: 0.012 },
+  { startTimestampMs: 65000, segmentId: 'guardedRecovery', playbackRate: 0.86, strideScale: 0.88, leanBias: 0.02 },
+  { startTimestampMs: 108000, segmentId: 'guardedRecovery', playbackRate: 0.82, strideScale: 0.84, leanBias: 0.025 },
 ];
 
 const pedriScenarioInfo: ScenarioInfo = {
   id: 'pedri-pressing-drift',
-  name: 'Pedri Pressing Drift',
+  name: 'Pedri Press-Decay Edge',
   description:
-    'Gradual fatigue-induced movement degradation after repeated pressing actions. Lower-confidence signal but actionable live.',
+    'Sustained fatigue only becomes commercially relevant because the same high-demand role keeps repeating.',
   playerProfile: PEDRI_PROFILE,
   durationMs: 120000,
   anomalyConfig: pedriAnomalyConfig,
   narrativeOverlays: pedriNarratives,
-  signalTimeline: pedriSignalTimeline,
+  contextTimeline: pedriContextTimeline,
+  poseTimeline: pedriPoseTimeline,
 };
-
-const musialaSignalTimeline: SignalTimelineEntry[] = [
-  { state: 'monitoring', startTimestampMs: 0 },
-  { state: 'alert', startTimestampMs: 30000 },
-  { state: 'monitoring', startTimestampMs: 38000 },
-];
-
-// --- Scenario 3: "Musiala Contact Reset" ---
 
 const musialaNarratives: NarrativeOverlay[] = [
   {
     timestampMs: 0,
-    durationMs: 5000,
-    text: 'Musiala carrying at the edge of the box - normal movement signature. MONITORING.',
+    durationMs: 6000,
+    text: 'Musiala is carrying near the box. This is the most dangerous context in the set, so any real sustained movement break would matter quickly.',
     type: 'context',
   },
   {
-    timestampMs: 25000,
-    durationMs: 5000,
-    text: 'Heavy contact near the box. Musiala takes two protective steps after landing.',
-    type: 'context',
-  },
-  {
-    timestampMs: 30000,
-    durationMs: 5000,
-    text: 'Visible hitch for 3-4 strides. Contact asymmetry spikes to 13%. Model enters ALERT.',
+    timestampMs: 26000,
+    durationMs: 7000,
+    text: 'Heavy contact. The surprise proxy jumps, but only for a handful of strides and with a small dip in source confidence during the collision.',
     type: 'detection',
   },
   {
-    timestampMs: 38000,
-    durationMs: 5000,
-    text: 'Movement normalizing. Load angle and stride compression are falling back toward baseline. Only three strides above threshold.',
-    type: 'detection',
-  },
-  {
-    timestampMs: 48000,
-    durationMs: 6000,
-    text: 'Model returns to MONITORING. Transient contact event - confirmation threshold was not met.',
+    timestampMs: 42000,
+    durationMs: 7000,
+    text: 'The movement proxy collapses back toward baseline before the pricing workflow can confirm. High game context alone is not enough.',
     type: 'result',
   },
   {
-    timestampMs: 60000,
-    durationMs: 6000,
-    text: 'Musiala fully normalized. The state machine prevented a false positive signal.',
+    timestampMs: 62000,
+    durationMs: 7000,
+    text: 'Edge closed. This is the anti-slop case: the system refuses to convert a brief contact scare into a live market opinion.',
     type: 'result',
+  },
+];
+
+const musialaContextTimeline: FootballContextKeyframe[] = [
+  {
+    startTimestampMs: 0,
+    playerPosition: { x: 77, y: 29 },
+    ballPosition: { x: 79, y: 30 },
+    possession: 'player_team',
+    ballAccess: 'on_ball',
+    pitchZone: 'box-edge',
+    phaseOfPlay: 'ball-carry',
+    roleDemand: 'extreme',
+    sourceConfidence: 0.95,
+    marketUrgency: 'immediate',
+    marketFamily: ['Next goal', 'Musiala shots', 'Bayern team total'],
+    feedLabel: 'Venue tracking + event sync',
+    note: 'Musiala is in the exact context where a real movement break would matter.',
   },
   {
-    timestampMs: 75000,
-    durationMs: 8000,
-    text: 'This is the difference between a useful football signal and noisy overreaction.',
-    type: 'result',
+    startTimestampMs: 26000,
+    playerPosition: { x: 81, y: 28 },
+    ballPosition: { x: 82, y: 29 },
+    possession: 'contested',
+    ballAccess: 'involved',
+    pitchZone: 'box-edge',
+    phaseOfPlay: 'ball-carry',
+    roleDemand: 'extreme',
+    sourceConfidence: 0.84,
+    marketUrgency: 'immediate',
+    marketFamily: ['Next goal', 'Musiala shots', 'Bayern team total'],
+    feedLabel: 'Venue tracking + event sync',
+    note: 'Collision creates noise right when the context is hottest.',
   },
+  {
+    startTimestampMs: 42000,
+    playerPosition: { x: 74, y: 24 },
+    ballPosition: { x: 68, y: 21 },
+    possession: 'player_team',
+    ballAccess: 'support',
+    pitchZone: 'final-third',
+    phaseOfPlay: 'settled-attack',
+    roleDemand: 'moderate',
+    sourceConfidence: 0.92,
+    marketUrgency: 'active',
+    marketFamily: ['Bayern team total', 'Next Bayern attack'],
+    feedLabel: 'Venue tracking + event sync',
+    note: 'The context is still useful, but the movement surprise has already faded.',
+  },
+];
+
+const musialaPoseTimeline: ScenarioPoseCue[] = [
+  { startTimestampMs: 0, segmentId: 'steadyCarry', playbackRate: 1.04, strideScale: 1.02 },
+  { startTimestampMs: 28000, segmentId: 'hardPlant', playbackRate: 0.98, strideScale: 0.94, leanBias: -0.01 },
+  { startTimestampMs: 38000, segmentId: 'steadyCarry', playbackRate: 1.0, strideScale: 1.0 },
 ];
 
 const musialaScenarioInfo: ScenarioInfo = {
   id: 'musiala-contact-reset',
   name: 'Musiala Contact Reset',
   description:
-    'Heavy contact produces a brief protective stride pattern, then the signal clears before any false escalation.',
+    'A high-urgency contact moment never becomes priceable because the movement signal clears before confirmation.',
   playerProfile: MUSIALA_PROFILE,
   durationMs: 90000,
   anomalyConfig: null,
   narrativeOverlays: musialaNarratives,
-  signalTimeline: musialaSignalTimeline,
+  contextTimeline: musialaContextTimeline,
+  poseTimeline: musialaPoseTimeline,
 };
-
-// --- Scenario registry ---
 
 export const SCENARIOS: ScenarioInfo[] = [
   sakaScenarioInfo,
@@ -266,8 +391,6 @@ export const SCENARIOS: ScenarioInfo[] = [
 export function getScenarioById(id: string): ScenarioInfo | undefined {
   return SCENARIOS.find((s) => s.id === id);
 }
-
-// --- Frame generation (lazy, cached) ---
 
 const frameCache = new Map<string, DemoFrame[]>();
 
@@ -287,9 +410,10 @@ export function generateFramesForScenario(
       scenario.durationMs,
       fps,
       28000,
-      4000,
+      4200,
       scenario.narrativeOverlays,
-      scenario.signalTimeline ?? null,
+      scenario.contextTimeline,
+      scenario.poseTimeline,
     );
   } else {
     data = generateScenarioFrames(
@@ -298,7 +422,8 @@ export function generateFramesForScenario(
       fps,
       scenario.anomalyConfig,
       scenario.narrativeOverlays,
-      scenario.signalTimeline ?? null,
+      scenario.contextTimeline,
+      scenario.poseTimeline,
     );
   }
 

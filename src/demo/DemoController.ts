@@ -126,12 +126,12 @@ export class DemoController {
   seekToNextEvent(): void {
     if (this.frames.length === 0) return;
 
-    // Find next frame where signal state changes or narrative overlay starts
-    const currentState = this.frames[this.currentFrameIndex].signalState.current;
+    // Find next frame where pricing state changes or narrative overlay starts
+    const currentState = this.frames[this.currentFrameIndex].pricingEdge.edgeState;
     for (let i = this.currentFrameIndex + 1; i < this.frames.length; i++) {
       const frame = this.frames[i];
       if (
-        frame.signalState.current !== currentState ||
+        frame.pricingEdge.edgeState !== currentState ||
         (frame.narrativeOverlay &&
           (i === 0 || !this.frames[i - 1].narrativeOverlay ||
             this.frames[i - 1].narrativeOverlay?.text !== frame.narrativeOverlay.text))

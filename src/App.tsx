@@ -2,13 +2,16 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type {
   DemoFrame,
   GaitMetricsSnapshot,
-  AnomalyResult,
-  SignalEvent,
+  PricingEdge,
+  EdgeEvent,
+  EdgeEventType,
+  EdgeStateType,
 } from './types/index.ts';
 import { DemoController } from './demo/DemoController.ts';
 import type { PlaybackSpeed } from './demo/DemoController.ts';
 import { SCENARIOS } from './demo/DemoScenarios.ts';
 import { DEMO_CUE_INDEX } from './demo/DemoCueIndex.ts';
+import MatchStatePanel from './ui/MatchStatePanel.tsx';
 import VideoPanel from './ui/VideoPanel.tsx';
 import GaitTimeline from './ui/GaitTimeline.tsx';
 import AnomalyAlert from './ui/AnomalyAlert.tsx';
@@ -23,9 +26,31 @@ function formatClock(ms: number): string {
   return `${min}:${sec.toString().padStart(2, '0')}`;
 }
 
+function transitionEventType(
+  previous: EdgeStateType,
+  next: EdgeStateType,
+): EdgeEventType | null {
+  if (next === 'warming' && previous === 'monitoring') return 'edge_opened';
+  if (next === 'confirmed') return 'edge_confirmed';
+  if (next === 'priceable') return 'edge_priceable';
+  if (next === 'monitoring' && previous !== 'monitoring') return 'edge_cleared';
+  return null;
+}
+
 export default function App() {
   const scenarios = SCENARIOS;
-  const initialScenarioId = scenarios[0]?.id ?? '';
+  const searchParams =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search)
+      : new URLSearchParams();
+  const poseOnlyMode = searchParams.get('view') === 'pose';
+  const autoplay = searchParams.get('autoplay') === '1';
+  const requestedSeekMs = Number(searchParams.get('seek') ?? '0');
+  const requestedScenarioId = searchParams.get('scenario');
+  const initialScenarioId =
+    (requestedScenarioId && scenarios.some((scenario) => scenario.id === requestedScenarioId)
+      ? requestedScenarioId
+      : scenarios[0]?.id) ?? '';
   const controllerRef = useRef<DemoController | null>(null);
   const [selectedId, setSelectedId] = useState(initialScenarioId);
   const [currentFrame, setCurrentFrame] = useState<DemoFrame | null>(null);
@@ -33,11 +58,10 @@ export default function App() {
   const [speed, setSpeed] = useState<PlaybackSpeed>(1);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
-
   const [gaitHistory, setGaitHistory] = useState<GaitMetricsSnapshot[]>([]);
-  const [anomalyHistory, setAnomalyHistory] = useState<AnomalyResult[]>([]);
-  const [signalEvents, setSignalEvents] = useState<SignalEvent[]>([]);
-  const lastSignalStateRef = useRef<string>('monitoring');
+  const [pricingHistory, setPricingHistory] = useState<PricingEdge[]>([]);
+  const [edgeEvents, setEdgeEvents] = useState<EdgeEvent[]>([]);
+  const lastEdgeStateRef = useRef<EdgeStateType>('monitoring');
 
   const handleFrame = useCallback((frame: DemoFrame) => {
     setCurrentFrame(frame);
@@ -50,84 +74,72 @@ export default function App() {
       return next.length > 1800 ? next.slice(-1800) : next;
     });
 
-    setAnomalyHistory((prev) => {
+    setPricingHistory((prev) => {
       const last = prev[prev.length - 1];
-      if (last && last.timestampMs === frame.anomalyResult.timestampMs) return prev;
-      const next = [...prev, frame.anomalyResult];
+      if (
+        last &&
+        last.stateEnteredAt === frame.pricingEdge.stateEnteredAt &&
+        Math.abs(last.edgeScore - frame.pricingEdge.edgeScore) < 1e-6
+      ) {
+        return prev;
+      }
+      const next = [...prev, frame.pricingEdge];
       return next.length > 1800 ? next.slice(-1800) : next;
     });
 
-    // Detect signal state transitions
-    const newState = frame.signalState.current;
-    if (newState !== 'monitoring' && newState !== lastSignalStateRef.current) {
-      const eventType =
-        newState === 'alert' ? 'alert_triggered' as const :
-        newState === 'confirmed' ? 'signal_confirmed' as const :
-        'signal_actionable' as const;
+    const nextState = frame.pricingEdge.edgeState;
+    const eventType = transitionEventType(lastEdgeStateRef.current, nextState);
 
-      const evt: SignalEvent = {
+    if (eventType) {
+      const event: EdgeEvent = {
         timestampMs: frame.timestampMs,
         type: eventType,
-        anomalyScore: frame.anomalyResult.compositeScore,
-        confidence: frame.anomalyResult.confidence,
-        marketImpact: {
-          playerPropDirection: 'under',
-          magnitudeEstimate: frame.anomalyResult.compositeScore > 0.6 ? 'major' : 'moderate',
-          affectedMarkets: ['Anytime Scorer', 'Shots On Target', 'Team Total Goals'],
-          estimatedPhasesToImpact: Math.max(
-            1,
-            Math.round(8 - frame.anomalyResult.compositeScore * 5),
-          ),
-        },
+        edgeScore: frame.pricingEdge.edgeScore,
+        movementSurprise: frame.pricingEdge.movementSurprise,
+        contextGate: frame.pricingEdge.contextGate,
+        sourceConfidence: frame.pricingEdge.sourceConfidence,
+        marketFamily: frame.pricingEdge.marketFamily,
+        timeToMarketImpact: frame.pricingEdge.timeToMarketImpact,
         topFeatures: frame.anomalyResult.contributingFeatures.slice(0, 3),
       };
-      setSignalEvents((prev) => [...prev, evt]);
+      setEdgeEvents((prev) => [...prev, event]);
     }
-    if (newState === 'monitoring' && lastSignalStateRef.current !== 'monitoring') {
-      const evt: SignalEvent = {
-        timestampMs: frame.timestampMs,
-        type: 'signal_cleared',
-        anomalyScore: frame.anomalyResult.compositeScore,
-        confidence: frame.anomalyResult.confidence,
-        marketImpact: {
-          playerPropDirection: 'neutral',
-          magnitudeEstimate: 'minor',
-          affectedMarkets: [],
-          estimatedPhasesToImpact: 0,
-        },
-        topFeatures: [],
-      };
-      setSignalEvents((prev) => [...prev, evt]);
-    }
-    lastSignalStateRef.current = newState;
+
+    lastEdgeStateRef.current = nextState;
   }, []);
 
-  // Initialize controller
   useEffect(() => {
     const controller = new DemoController({
       onFrame: handleFrame,
-      onPlayStateChange: (p) => setPlaying(p),
+      onPlayStateChange: (isPlaying) => setPlaying(isPlaying),
       onComplete: () => setPlaying(false),
     });
 
     controllerRef.current = controller;
     if (initialScenarioId) {
       controller.loadScenario(initialScenarioId);
+      if (requestedSeekMs > 0) {
+        controller.seek(requestedSeekMs);
+      }
+      if (autoplay) {
+        controller.play();
+      }
     }
 
     return () => controller.destroy();
-  }, [handleFrame, initialScenarioId]);
+  }, [autoplay, handleFrame, initialScenarioId, requestedSeekMs]);
 
   const handleScenarioChange = useCallback((id: string) => {
-    const ctrl = controllerRef.current;
-    if (!ctrl) return;
+    const controller = controllerRef.current;
+    if (!controller) return;
+
     setLoading(true);
     setProgress(0);
     setGaitHistory([]);
-    setAnomalyHistory([]);
-    setSignalEvents([]);
-    lastSignalStateRef.current = 'monitoring';
-    ctrl.loadScenario(id);
+    setPricingHistory([]);
+    setEdgeEvents([]);
+    lastEdgeStateRef.current = 'monitoring';
+    controller.loadScenario(id);
     setSelectedId(id);
     setLoading(false);
   }, []);
@@ -136,38 +148,48 @@ export default function App() {
     controllerRef.current?.togglePlayPause();
   }, []);
 
-  const handleSpeedChange = useCallback((s: PlaybackSpeed) => {
-    setSpeed(s);
-    controllerRef.current?.setSpeed(s);
+  const handleSpeedChange = useCallback((nextSpeed: PlaybackSpeed) => {
+    setSpeed(nextSpeed);
+    controllerRef.current?.setSpeed(nextSpeed);
   }, []);
 
   const handleReset = useCallback(() => {
-    const ctrl = controllerRef.current;
-    if (!ctrl) return;
-    ctrl.pause();
-    ctrl.seek(0);
+    const controller = controllerRef.current;
+    if (!controller) return;
+
+    controller.pause();
+    controller.seek(0);
     setProgress(0);
     setGaitHistory([]);
-    setAnomalyHistory([]);
-    setSignalEvents([]);
-    lastSignalStateRef.current = 'monitoring';
+    setPricingHistory([]);
+    setEdgeEvents([]);
+    lastEdgeStateRef.current = 'monitoring';
   }, []);
 
   const handleSeek = useCallback((timestampMs: number) => {
-    const ctrl = controllerRef.current;
-    if (!ctrl) return;
-    ctrl.seek(timestampMs);
+    controllerRef.current?.seek(timestampMs);
   }, []);
 
   const handleScrubStart = useCallback(() => {
     controllerRef.current?.pause();
   }, []);
 
-  const scenario = scenarios.find((s) => s.id === selectedId) ?? null;
+  const scenario = scenarios.find((item) => item.id === selectedId) ?? null;
   const profile = scenario?.playerProfile ?? null;
+  const cuePoints = DEMO_CUE_INDEX[selectedId] ?? [];
   const currentTimestampMs = currentFrame?.timestampMs ?? 0;
   const totalDurationMs = scenario?.durationMs ?? 0;
-  const cuePoints = DEMO_CUE_INDEX[selectedId] ?? [];
+
+  const videoPanel = (
+    <VideoPanel
+      displayPose={currentFrame?.displayPose ?? null}
+      footballContext={currentFrame?.footballContext ?? null}
+      contributingFeatures={currentFrame?.anomalyResult.contributingFeatures ?? []}
+      severity={currentFrame?.anomalyResult.severity ?? 'normal'}
+      narrativeOverlay={currentFrame?.narrativeOverlay ?? null}
+      poseOnly={poseOnlyMode}
+    />
+  );
 
   const cueChipClassByKind: Record<'context' | 'detection' | 'result', string> = {
     context: 'border-cyan/30 text-cyan hover:bg-cyan/10',
@@ -175,27 +197,42 @@ export default function App() {
     result: 'border-red/30 text-red hover:bg-red/10',
   };
 
+  if (poseOnlyMode) {
+    return (
+      <div className="min-h-screen bg-[#05070c] flex items-center justify-center p-6">
+        <div className="w-full max-w-[1280px]">{videoPanel}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-bg">
-      {/* Top Bar */}
       <header className="flex items-center justify-between px-6 py-3 border-b border-border bg-surface flex-shrink-0">
         <div className="flex items-center gap-4">
-          <h1 className="font-sans text-lg font-bold tracking-tight">
-            <span className="text-cyan">GAIT</span>
-            <span className="text-text-primary">SIGNAL</span>
-          </h1>
-          <div className="h-5 w-px bg-border" />
+          <div>
+            <h1 className="font-sans text-lg font-bold tracking-tight">
+              <span className="text-cyan">GAIT</span>
+              <span className="text-text-primary">SIGNAL</span>
+              <span className="text-amber ml-2">LIVE EDGE</span>
+            </h1>
+            <p className="text-text-secondary font-mono text-[11px] mt-1 uppercase tracking-widest">
+              In-stadium football pricing workflow demo
+            </p>
+          </div>
+          <div className="h-8 w-px bg-border" />
           <select
             value={selectedId}
-            onChange={(e) => handleScenarioChange(e.target.value)}
+            onChange={(event) => handleScenarioChange(event.target.value)}
             className="bg-bg border border-border rounded px-3 py-1.5 text-text-primary font-mono text-xs focus:outline-none focus:border-cyan/50"
           >
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+            {scenarios.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
             ))}
           </select>
           {scenario && (
-            <span className="text-text-secondary font-sans text-xs hidden lg:block max-w-96 truncate">
+            <span className="text-text-secondary font-sans text-xs hidden xl:block max-w-[34rem] truncate">
               {scenario.description}
             </span>
           )}
@@ -203,15 +240,17 @@ export default function App() {
 
         <div className="flex items-center gap-3">
           <div className="flex gap-1">
-            {([0.5, 1, 2] as PlaybackSpeed[]).map((s) => (
+            {([0.5, 1, 2] as PlaybackSpeed[]).map((value) => (
               <button
-                key={s}
-                onClick={() => handleSpeedChange(s)}
+                key={value}
+                onClick={() => handleSpeedChange(value)}
                 className={`font-mono text-xs px-2 py-1 rounded transition-colors ${
-                  speed === s ? 'bg-cyan/15 text-cyan' : 'text-text-secondary hover:text-text-primary'
+                  speed === value
+                    ? 'bg-cyan/15 text-cyan'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                {s}x
+                {value}x
               </button>
             ))}
           </div>
@@ -231,7 +270,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Timeline + cue index */}
       <div className="px-4 py-2 border-b border-border bg-bg/80 flex-shrink-0">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs text-text-secondary w-10 text-right">
@@ -250,7 +288,7 @@ export default function App() {
               step={100}
               value={currentTimestampMs}
               onPointerDown={handleScrubStart}
-              onChange={(e) => handleSeek(Number(e.target.value))}
+              onChange={(event) => handleSeek(Number(event.target.value))}
               className="w-full accent-cyan bg-transparent appearance-none cursor-pointer"
               aria-label="Scenario timeline"
             />
@@ -278,31 +316,31 @@ export default function App() {
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-text-secondary font-mono text-sm animate-pulse">Loading scenario data...</p>
+          <p className="text-text-secondary font-mono text-sm animate-pulse">
+            Loading in-stadium scenario data...
+          </p>
         </div>
       ) : (
         <div className="flex-1 grid grid-cols-12 gap-4 p-4 overflow-hidden min-h-0">
-          {/* Left: Video + Skeleton (5/12 ~ 40%) */}
           <div className="col-span-5 flex flex-col gap-4 overflow-y-auto">
-            <VideoPanel
-              keypoints={currentFrame?.keypoints ?? null}
-              contributingFeatures={currentFrame?.anomalyResult.contributingFeatures ?? []}
-              severity={currentFrame?.anomalyResult.severity ?? 'normal'}
-              narrativeOverlay={currentFrame?.narrativeOverlay ?? null}
+            <MatchStatePanel
+              context={currentFrame?.footballContext ?? null}
+              playerName={profile?.player.name ?? 'Player'}
+              teamName={profile?.player.team ?? 'Team'}
             />
+            {videoPanel}
             <PlayerProfile
               profile={profile}
               currentMetrics={currentFrame?.gaitMetrics ?? null}
             />
           </div>
 
-          {/* Center: Gait Timeline (4/12 ~ 35%) */}
           <div className="col-span-4 flex flex-col gap-4 overflow-y-auto">
             <GaitTimeline
               gaitHistory={gaitHistory}
-              anomalyHistory={anomalyHistory}
-              signalEvents={signalEvents}
-              currentTimestampMs={currentFrame?.timestampMs ?? 0}
+              pricingHistory={pricingHistory}
+              edgeEvents={edgeEvents}
+              currentTimestampMs={currentTimestampMs}
             />
             <BaselineComparison
               profile={profile}
@@ -310,16 +348,14 @@ export default function App() {
             />
           </div>
 
-          {/* Right: Anomaly + Betting (3/12 ~ 25%) */}
           <div className="col-span-3 flex flex-col gap-4 overflow-y-auto">
             <AnomalyAlert
               anomalyResult={currentFrame?.anomalyResult ?? null}
-              signalState={currentFrame?.signalState ?? null}
+              pricingEdge={currentFrame?.pricingEdge ?? null}
             />
             <BettingSignalPanel
-              signalState={currentFrame?.signalState ?? null}
-              signalHistory={signalEvents}
-              anomalyResult={currentFrame?.anomalyResult ?? null}
+              pricingEdge={currentFrame?.pricingEdge ?? null}
+              edgeHistory={edgeEvents}
               playerName={profile?.player.name ?? 'Player'}
             />
           </div>

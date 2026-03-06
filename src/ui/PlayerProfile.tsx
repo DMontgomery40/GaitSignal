@@ -160,11 +160,11 @@ export default function PlayerProfile({ profile, currentMetrics }: PlayerProfile
 
       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
         <div>
-          <span className="text-text-secondary block">Baseline Matches</span>
+          <span className="text-text-secondary block">Tracked Matches</span>
           <span className="text-text-primary">{profile.gamesInBaseline}</span>
         </div>
         <div>
-          <span className="text-text-secondary block">Last Update</span>
+          <span className="text-text-secondary block">Last Retrain</span>
           <span className="text-text-primary">{profile.lastBaselineUpdate}</span>
         </div>
       </div>

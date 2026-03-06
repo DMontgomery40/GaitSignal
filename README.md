@@ -1,116 +1,86 @@
 # GaitSignal
 
-> Per-player movement anomaly detection from football video: turn pose-derived biomechanics into a live, confidence-scored signal.
+> Live football pricing-edge demo: use contracted in-stadium tracking plus player-specific movement surprise to surface in-play market information before standard pricing digestion catches up.
 
-**Status: idea stage.** This repository is a concept demo, not a production model. It uses synthetic movement streams and deterministic anomaly logic to show what a real football pipeline could output in real time. There is no live video ingestion, no trained pose model, and no deployed inference service in this repo.
+**Status: concept demo.** This repository is a synthetic React prototype. It does not train real player models or ingest live venue feeds. It shows what the workflow, evidence stack, and trading-desk surface could look like if bet365 had contracted low-latency access to in-stadium football tracking and synced event feeds.
 
-This is the companion concept to [Acoustic Momentum](https://github.com/dmontgomery40/acoustic-momentum): one signal from the crowd, one signal from the player. The common theme is alternative in-play intelligence from data that already exists in the venue.
+This is the companion concept to [Acoustic Momentum](https://github.com/dmontgomery40/acoustic-momentum): one modality from the crowd, one modality from the player. The common theme is in-play information that the market may not fully price yet.
 
-![GaitSignal - Saka actionable movement signal](screenshots/saka-actionable.png)
+![GaitSignal - Saka pricing edge](screenshots/saka-actionable.png)
 
-Football broadcasts already capture every sprint, deceleration, recovery run, and contact event. Standard tracking tells you where a player is. GaitSignal is aimed at the missing layer: how that player is moving relative to their own baseline.
+## Core Thesis
 
-## What It Is
+For a company like bet365, player and ball location should be treated as **venue-grade infrastructure**, not the differentiated idea. The differentiated layer is:
 
-GaitSignal is a per-player movement deviation framework.
+- one model per player
+- player-specific movement surprise instead of universal thresholds
+- football context gating so the same movement drift only matters when the role, phase, and market window make it commercially relevant
 
-- Each player has a personal baseline.
-- Live movement is converted into a 20-feature biomechanical vector.
-- The system scores change against that player's own normal pattern.
-- Sustained multi-feature drift escalates through a 4-state machine:
+The question is not “can we rebuild commodity match state from scratch?” The question is “once venue state already exists, what extra live edge can we extract from how a player is moving?”
 
-`monitoring -> alert -> confirmed -> actionable`
+## What The Demo Shows
 
-## What It Is Not
+Each scenario generates:
 
-This is not an injury diagnosis engine.
+- a synthetic 20-feature biomechanical vector
+- a player-specific movement-surprise proxy
+- a venue-style football context stream
+- a computed pricing edge driven by movement surprise, context gate, source confidence, and market urgency
 
-The point is to detect movement change, not to claim why the change happened. Fatigue, contact, tactical role change, or an emerging physical issue can all produce a signal. Interpretation is downstream.
+The UI is organized like a live desk:
 
-## Why Football Video
+- **Match-State / Venue Feed**: contracted tracking context, ball distance, phase of play
+- **Player Motion Lens**: pose-style lower-body evidence for the selected player
+- **Pricing Workflow Timeline**: movement surprise, context gate, edge score, source confidence
+- **In-Play Pricing Edge**: warming, confirmed, and priceable states tied to market families
 
-Football is the right stress test because the signal has to survive real noise:
+## Production Story
 
-- frequent contact and transient limps
-- changing camera angle, zoom, and occlusion
-- player-specific movement signatures
-- match-state shifts between settled possession, transition, pressing, and recovery
+The production assumption is explicit:
 
-A useful system should escalate on sustained correlated drift and clear quickly on one-off contact artifacts. That distinction is built into the demo.
+- bet365 has access to contracted in-stadium optical tracking / pose-capable capture
+- event/state feeds are synchronized at low latency
+- the innovation budget goes above commodity tracking and into the player-specific layer
 
-## Architecture
+That player-specific layer would be:
 
-### Demo (this repository)
+1. Per-player temporal model
+2. Prediction-surprise / gradient-delta style scoring
+3. Context gate using possession, ball access, pitch zone, and role demand
+4. Trading workflow that only opens when movement surprise and football context agree
 
-Synthetic per-frame movement data is generated for each scenario, scored against the selected player's baseline, and rendered in a React dashboard with:
+This is not an injury diagnosis engine. It is a pricing-edge system for selected high-value players and market windows.
 
-- skeleton overlay on a football pitch
-- live movement metric timeline
-- scenario cue index for fast scrubbing
-- trading signal panel tied to football markets
+## Scenario Logic
 
-```text
-Synthetic movement frames
-        ->
-20-D biomechanical feature vector
-        ->
-Anomaly scorer + state machine
-        ->
-Football trading signal UI
-```
+### 1. Saka Recovery-Run Reprice
 
-### Production Direction (proposed)
+Movement drift begins during defensive recovery, but it is not priceable yet because Arsenal are still out of possession. The edge opens only when Saka becomes the immediate attacking outlet in a live transition / final-third phase.
 
-A real system would add:
-
-- player and ball detection / tracking
-- pitch calibration and homography into pitch coordinates
-- lower-body and trunk pose estimation
-- per-player temporal models
-- online anomaly scoring with confidence calibration
-- event-aware gating to suppress obvious false positives after short contact events
-
-## Research Framing
-
-The practical research sequence is:
-
-1. Recover player tracks, ball track, and pitch coordinates from match video.
-2. Measure pose quality and decide what movement features are actually stable enough to trust from broadcast footage.
-3. Compare simple baselines first: rolling z-score, one-class models, and sequence anomaly models.
-4. Optimize for false-positive rate, lead time, and stability, not just raw accuracy.
-5. Only after the extraction layer is trustworthy, move to higher-order outputs such as fatigue, tactical role drift, or market-facing signals.
-
-The central question is not "can a model detect everything?" It is "what can be extracted reliably enough from football video to be decision-useful in real time?"
-
-## Demo Scenarios
-
-### 1. Saka Touchline Guarding
-
-Primary demo. A subtle right-side guarding pattern appears after a long recovery sprint and hard deceleration. The system progresses cleanly from `monitoring` to `actionable`.
-
-| Baseline | Actionable |
+| Baseline | Priceable |
 | --- | --- |
 | ![Saka baseline monitoring](screenshots/saka-baseline.png) | ![Saka actionable signal](screenshots/saka-actionable.png) |
 
-### 2. Pedri Pressing Drift
+### 2. Pedri Press-Decay Edge
 
-Late-match workload accumulation produces a slower, lower-confidence signal. This is not an acute-event story. It is a "something is degrading over repeated actions" story.
+Gradual fatigue only matters because Barcelona keep Pedri in the same high-demand pressing / recycling role. The market edge stays alive while the tactical demand stays alive.
 
 ### 3. Musiala Contact Reset
 
-Heavy contact creates a brief perturbation and a short alert, but the signal clears before confirmation. That is intentional. A system like this is only useful if it knows when not to fire.
+This is the anti-slop case. Even in a very hot attacking context, a transient contact spike clears before the workflow can confirm and price it.
 
 ![Musiala transient alert reset](screenshots/musiala-reset.png)
 
-## Current Branch Goal
+## Why This Branch Exists
 
-This branch reframes the original basketball concept around European football:
+This branch intentionally moves away from “football as a reskinned basketball demo” and toward a football-native workflow:
 
-- football-specific scenarios
-- football market mappings
-- football pitch visualization
-- player profiles for Saka, Pedri, and Musiala
-- cue points tuned for demo recording and explainer video production
+- fixed in-stadium / contracted-data assumption
+- no scripted state timeline overrides
+- no hard-coded market impact from gait features alone
+- no medical-style alert story as the primary product
+
+The point is to show how a real, low-latency, contracted-data system could work in practice.
 
 ## Running The Demo
 
@@ -119,4 +89,4 @@ npm install
 npm run dev
 ```
 
-Then open the local Vite app, choose a scenario, and use the timeline to scrub directly to the key moments.
+Then open the Vite app, choose a scenario, and scrub through the cue points to see how venue context changes the meaning of the same movement signal.

@@ -8,17 +8,26 @@ import type {
   FilteredKeypoints,
   GaitMetricsSnapshot,
   AnomalyResult,
-  SignalState,
-  SignalTimelineEntry,
   DemoFrame,
   JointAngles,
   StrideUpdate,
   SymmetryReport,
   FeatureContribution,
+  FootballContextKeyframe,
   NarrativeOverlay,
   Point3D,
+  ScenarioPoseCue,
 } from '../types/index.ts';
 import { FEATURE_NAMES } from '../types/index.ts';
+import {
+  buildScenarioDisplayPose,
+  displayPoseToFilteredKeypoints,
+} from './PoseReplay.ts';
+import {
+  createInitialPricingEdge,
+  getFootballContext,
+  updatePricingEdge,
+} from './PricingModel.ts';
 
 // --- Random helpers ---
 
@@ -471,110 +480,6 @@ function computeAnomalyResult(
   };
 }
 
-// --- Signal state machine ---
-
-function updateSignalState(
-  prev: SignalState,
-  anomaly: AnomalyResult,
-  isNewStride: boolean,
-): SignalState {
-  const state = { ...prev };
-  state.lastAnomalyResult = anomaly;
-
-  if (!isNewStride) {
-    return state;
-  }
-
-  if (anomaly.compositeScore >= 0.32) {
-    state.consecutiveStridesAboveThreshold += 1;
-  } else {
-    state.consecutiveStridesAboveThreshold = Math.max(0, state.consecutiveStridesAboveThreshold - 1);
-  }
-
-  // State transitions
-  if (anomaly.compositeScore < 0.18 && state.consecutiveStridesAboveThreshold <= 0) {
-    state.current = 'monitoring';
-    state.enteredAt = anomaly.timestampMs;
-  } else if (
-    state.current === 'monitoring' &&
-    anomaly.compositeScore >= 0.32 &&
-    state.consecutiveStridesAboveThreshold >= 2
-  ) {
-    state.current = 'alert';
-    state.enteredAt = anomaly.timestampMs;
-  } else if (
-    state.current === 'alert' &&
-    state.consecutiveStridesAboveThreshold >= 5 &&
-    anomaly.compositeScore >= 0.34 &&
-    anomaly.confidence >= 0.5
-  ) {
-    state.current = 'confirmed';
-    state.enteredAt = anomaly.timestampMs;
-  } else if (
-    state.current === 'confirmed' &&
-    (
-      (anomaly.compositeScore >= 0.5 && anomaly.confidence >= 0.7) ||
-      anomaly.compositeScore >= 0.65 ||
-      (state.consecutiveStridesAboveThreshold >= 12 &&
-        anomaly.compositeScore >= 0.35 &&
-        anomaly.confidence >= 0.5)
-    )
-  ) {
-    state.current = 'actionable';
-    state.enteredAt = anomaly.timestampMs;
-  } else if (
-    (state.current === 'alert' || state.current === 'confirmed' || state.current === 'actionable') &&
-    anomaly.compositeScore < 0.2 &&
-    state.consecutiveStridesAboveThreshold <= 0
-  ) {
-    state.current = 'monitoring';
-    state.enteredAt = anomaly.timestampMs;
-    state.consecutiveStridesAboveThreshold = 0;
-  }
-
-  return state;
-}
-
-function applySignalTimeline(
-  prev: SignalState,
-  anomaly: AnomalyResult,
-  timestampMs: number,
-  signalTimeline: SignalTimelineEntry[] | null,
-): SignalState {
-  if (!signalTimeline || signalTimeline.length === 0) {
-    return prev;
-  }
-
-  let active = signalTimeline[0];
-  for (const entry of signalTimeline) {
-    if (timestampMs >= entry.startTimestampMs) {
-      active = entry;
-    } else {
-      break;
-    }
-  }
-
-  const next: SignalState = {
-    ...prev,
-    current: active.state,
-    enteredAt: active.startTimestampMs,
-    lastAnomalyResult: anomaly,
-  };
-
-  const elapsed = Math.max(0, timestampMs - active.startTimestampMs);
-  if (active.state === 'monitoring') {
-    next.consecutiveStridesAboveThreshold = 0;
-  } else if (active.state === 'alert') {
-    next.consecutiveStridesAboveThreshold = Math.min(4, 1 + Math.floor(elapsed / 1200));
-  } else if (active.state === 'confirmed') {
-    next.consecutiveStridesAboveThreshold = Math.min(8, 5 + Math.floor(elapsed / 1500));
-  } else {
-    next.consecutiveStridesAboveThreshold = 8 + Math.floor(elapsed / 1200);
-  }
-
-  return next;
-}
-
 function smoothFeatureVector(next: number[], prev: number[], alpha: number): number[] {
   return next.map((value, i) => prev[i] + (value - prev[i]) * alpha);
 }
@@ -592,26 +497,21 @@ export function generateScenarioFrames(
   fps: number,
   anomalyConfig: AnomalyConfig | null,
   narrativeOverlays: NarrativeOverlay[],
-  signalTimeline: SignalTimelineEntry[] | null = null,
+  contextTimeline: FootballContextKeyframe[],
+  poseTimeline: ScenarioPoseCue[],
 ): GeneratedScenarioData {
   const totalFrames = Math.floor((durationMs / 1000) * fps);
   const frameDurationMs = 1000 / fps;
 
-  // Basketball running: stride at 1.2-1.5 Hz
-  const strideFrequency = 1.35; // Hz
+  // High-intensity football running cadence in a live attacking / recovery sequence.
+  const strideFrequency = 1.35;
   const strideFrames = Math.round(fps / strideFrequency);
 
   const frames: DemoFrame[] = [];
   const recentFeatures: number[][] = [];
   const rng = createSeededRng(hashSeed(`${profile.player.name}-${durationMs}-${fps}-${anomalyConfig?.type ?? 'none'}`));
   let prevFeatures = [...profile.baselineMean];
-
-  let signalState: SignalState = {
-    current: 'monitoring',
-    enteredAt: 0,
-    consecutiveStridesAboveThreshold: 0,
-    lastAnomalyResult: null,
-  };
+  let pricingEdge = createInitialPricingEdge();
 
   let strideCount = 0;
 
@@ -641,7 +541,6 @@ export function generateScenarioFrames(
     if (recentFeatures.length > 30) recentFeatures.shift();
 
     // Generate derived data
-    const keypoints = featureVectorToKeypoints(features, i, timestampMs, stridePhase, rng);
     const gaitMetrics = featureVectorToGaitMetrics(
       features,
       i,
@@ -650,8 +549,16 @@ export function generateScenarioFrames(
       isNewStride,
     );
     const anomalyResult = computeAnomalyResult(features, profile, timestampMs, recentFeatures);
-    signalState = updateSignalState(signalState, anomalyResult, isNewStride);
-    signalState = applySignalTimeline(signalState, anomalyResult, timestampMs, signalTimeline);
+    const footballContext = getFootballContext(timestampMs, contextTimeline);
+    const displayPose = buildScenarioDisplayPose(
+      timestampMs,
+      i,
+      poseTimeline,
+      anomalyResult.compositeScore,
+      anomalyConfig?.affectedSide ?? 'bilateral',
+    );
+    const keypoints = displayPoseToFilteredKeypoints(displayPose);
+    pricingEdge = updatePricingEdge(pricingEdge, anomalyResult, footballContext, isNewStride);
 
     // Find active narrative overlay
     const activeOverlay =
@@ -665,9 +572,11 @@ export function generateScenarioFrames(
       timestampMs,
       frameIndex: i,
       keypoints,
+      displayPose,
       gaitMetrics,
       anomalyResult,
-      signalState: { ...signalState },
+      footballContext,
+      pricingEdge: { ...pricingEdge },
       narrativeOverlay: activeOverlay,
     });
   }
@@ -686,7 +595,8 @@ export function generateTransientSpikeFrames(
   spikeOnsetMs: number,
   spikeDurationMs: number,
   narrativeOverlays: NarrativeOverlay[],
-  signalTimeline: SignalTimelineEntry[] | null = null,
+  contextTimeline: FootballContextKeyframe[],
+  poseTimeline: ScenarioPoseCue[],
 ): GeneratedScenarioData {
   const totalFrames = Math.floor((durationMs / 1000) * fps);
   const frameDurationMs = 1000 / fps;
@@ -697,13 +607,7 @@ export function generateTransientSpikeFrames(
   const recentFeatures: number[][] = [];
   const rng = createSeededRng(hashSeed(`${profile.player.name}-${durationMs}-${fps}-transient`));
   let prevFeatures = [...profile.baselineMean];
-
-  let signalState: SignalState = {
-    current: 'monitoring',
-    enteredAt: 0,
-    consecutiveStridesAboveThreshold: 0,
-    lastAnomalyResult: null,
-  };
+  let pricingEdge = createInitialPricingEdge();
 
   let strideCount = 0;
 
@@ -749,7 +653,6 @@ export function generateTransientSpikeFrames(
     recentFeatures.push(features);
     if (recentFeatures.length > 30) recentFeatures.shift();
 
-    const keypoints = featureVectorToKeypoints(features, i, timestampMs, stridePhase, rng);
     const gaitMetrics = featureVectorToGaitMetrics(
       features,
       i,
@@ -758,8 +661,16 @@ export function generateTransientSpikeFrames(
       isNewStride,
     );
     const anomalyResult = computeAnomalyResult(features, profile, timestampMs, recentFeatures);
-    signalState = updateSignalState(signalState, anomalyResult, isNewStride);
-    signalState = applySignalTimeline(signalState, anomalyResult, timestampMs, signalTimeline);
+    const footballContext = getFootballContext(timestampMs, contextTimeline);
+    const displayPose = buildScenarioDisplayPose(
+      timestampMs,
+      i,
+      poseTimeline,
+      anomalyResult.compositeScore,
+      'left',
+    );
+    const keypoints = displayPoseToFilteredKeypoints(displayPose);
+    pricingEdge = updatePricingEdge(pricingEdge, anomalyResult, footballContext, isNewStride);
 
     const activeOverlay =
       narrativeOverlays.find(
@@ -772,9 +683,11 @@ export function generateTransientSpikeFrames(
       timestampMs,
       frameIndex: i,
       keypoints,
+      displayPose,
       gaitMetrics,
       anomalyResult,
-      signalState: { ...signalState },
+      footballContext,
+      pricingEdge: { ...pricingEdge },
       narrativeOverlay: activeOverlay,
     });
   }

@@ -17,8 +17,8 @@ export default function NarrativeOverlay({ overlay }: NarrativeOverlayProps) {
 
   const typeLabels: Record<NarrativeOverlayType['type'], string> = {
     context: 'CONTEXT',
-    detection: 'DETECTION',
-    result: 'RESULT',
+    detection: 'MODEL',
+    result: 'EDGE',
   };
 
   return (
